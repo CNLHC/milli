@@ -20,7 +20,7 @@ impl<R: io::Read + io::Seek> DocumentsReader<R> {
     /// Construct a DocumentsReader from a reader.
     ///
     /// It first retrieves the index, then moves to the first document. Subsequent calls to
-    /// `next_document` will will advance the document reader until all the documents have been read.
+    /// `next_document` advance the document reader until all the documents have been read.
     pub fn from_reader(mut reader: R) -> Result<Self, Error> {
         let mut buffer = Vec::new();
 

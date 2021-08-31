@@ -1,4 +1,4 @@
-use std::io::{self, Write};
+use std::io;
 
 use bimap::BiHashMap;
 use byteorder::{BigEndian, WriteBytesExt};
@@ -15,7 +15,6 @@ pub struct DocumentsBuilder<W> {
 impl<W: io::Write + io::Seek> DocumentsBuilder<W> {
     pub fn new(writer: W, index: BiHashMap<FieldId, String>) -> Result<Self, Error> {
         let mut writer = ByteCounter::new(writer);
-
         // add space to write the offset of the metadata at the end of the writer
         writer.write_u64::<BigEndian>(0)?;
 
@@ -25,7 +24,8 @@ impl<W: io::Write + io::Seek> DocumentsBuilder<W> {
         Ok(Self { serializer })
     }
 
-    pub fn count(&self) -> usize {
+    /// Returns the number of documents that have been written to the builder.
+    pub fn len(&self) -> usize {
         self.serializer.count
     }
 
@@ -52,20 +52,13 @@ impl<W: io::Write + io::Seek> DocumentsBuilder<W> {
         Ok(())
     }
 
-    /// Adds a document that can be serilized. The internal index is updated with the fields found
-    /// in the documents;
+    /// Adds documents to the builder.
+    ///
+    /// The internal index is updated with the fields found
+    /// in the documents. Document must either be a map or a sequences of map, anything else will
+    /// fail.
     pub fn add_documents<T: Serialize>(&mut self, document: T) -> Result<(), Error> {
         document.serialize(&mut self.serializer)?;
-        Ok(())
-    }
-
-    /// Adds a raw document. This internal index **is not** updated, so it is expected that the
-    /// index provided in the constructor is correct.
-    pub fn add_raw_document(&mut self, document: impl AsRef<[u8]>) -> Result<(), Error> {
-        let document = document.as_ref();
-        self.serializer.writer.write_u32::<BigEndian>(document.len() as u32)?;
-        self.serializer.writer.write_all(document)?;
-        self.serializer.count += 1;
         Ok(())
     }
 }

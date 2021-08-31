@@ -42,14 +42,14 @@ mod test {
     use crate::update::{IndexDocumentsMethod, UpdateBuilder};
     use crate::{DocumentId, FieldId, BEU32};
 
-    static JSON: Lazy<Vec<u8>> = Lazy::new(generate_json);
+    static JSON: Lazy<Vec<u8>> = Lazy::new(generate_documents);
 
-    fn generate_json() -> Vec<u8> {
+    fn generate_documents() -> Vec<u8> {
         let mut rng = rand::thread_rng();
         let num_docs = rng.gen_range(10..30);
 
-        let mut documents = Vec::new();
-
+        let mut cursor = Cursor::new(Vec::new());
+        let mut builder = DocumentsBuilder::new(&mut cursor, BiHashMap::new()).unwrap();
         let txts = ["Toto", "Titi", "Tata"];
         let cats = (1..10).map(|i| i.to_string()).collect::<Vec<_>>();
         let cat_ints = (1..10).collect::<Vec<_>>();
@@ -69,15 +69,10 @@ mod test {
                 "txts": sample_txts[..(rng.gen_range(0..3))],
                 "cat-ints": sample_ints[..(rng.gen_range(0..3))],
             });
-            documents.push(doc);
+            builder.add_documents(doc).unwrap();
         }
 
-        let mut cursor = Cursor::new(Vec::new());
-        let mut builder = DocumentsBuilder::new(&mut cursor, BiHashMap::new()).unwrap();
-
-        builder.add_documents(documents).unwrap();
         builder.finish().unwrap();
-
         cursor.into_inner()
     }
 

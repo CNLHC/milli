@@ -16,7 +16,7 @@ use structopt::StructOpt;
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "example", about = "An example of StructOpt usage.")]
+#[structopt(name = "Milli CLI", about = "A simple CLI to manipulate a milli index.")]
 struct Cli {
     #[structopt(short, long)]
     index_path: PathBuf,
@@ -36,7 +36,7 @@ enum Command {
     SettingsUpdate(SettingsUpdate),
 }
 
-fn setup(opt: &Cli) -> eyre::Result<()> {
+fn setup(opt: &Cli) -> Result<()> {
     color_eyre::install()?;
     stderrlog::new()
         .verbosity(opt.verbose)
@@ -88,10 +88,10 @@ impl FromStr for DocumentAdditionFormat {
 struct DocumentAddition {
     #[structopt(short, long, default_value = "json")]
     format: DocumentAdditionFormat,
-    /// Path of the update file, if not present, will read from stdin.
+    /// Path to the update file, if not present, will read from stdin.
     #[structopt(short, long)]
     path: Option<PathBuf>,
-    /// Wheter to generate missing document ids.
+    /// Whether to generate missing document ids.
     #[structopt(short, long)]
     autogen_docids: bool,
     /// Whether to update or replace the documents if they already exist.
@@ -110,6 +110,7 @@ impl DocumentAddition {
         };
 
         println!("parsing documents...");
+
         let documents = match self.format {
             DocumentAdditionFormat::Csv => documents_from_csv(reader)?,
             DocumentAdditionFormat::Json => documents_from_json(reader)?,
@@ -117,6 +118,7 @@ impl DocumentAddition {
         };
 
         let reader = milli::documents::DocumentsReader::from_reader(Cursor::new(documents))?;
+
         println!("Adding {} documents to the index.", reader.len());
 
         let mut txn = index.env.write_txn()?;
@@ -148,7 +150,7 @@ impl DocumentAddition {
 
         txn.commit()?;
 
-        println!("result {:?}", result);
+        println!("{:?}", result);
         Ok(())
     }
 }
@@ -207,8 +209,6 @@ fn documents_from_jsonl(reader: impl Read) -> Result<Vec<u8>> {
         documents.add_documents(document)?;
     }
     documents.finish()?;
-
-    println!("finished conversion");
 
     Ok(writer.into_inner())
 }
@@ -303,7 +303,7 @@ struct SettingsUpdate {
 }
 
 impl SettingsUpdate {
-    fn perform(&self, index: milli::Index) -> eyre::Result<()> {
+    fn perform(&self, index: milli::Index) -> Result<()> {
         let mut txn = index.env.write_txn()?;
 
         let mut update = milli::update::Settings::new(&mut txn, &index, 0);

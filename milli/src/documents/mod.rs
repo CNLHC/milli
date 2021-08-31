@@ -7,16 +7,14 @@ mod builder;
 mod reader;
 mod serde;
 
-use std::fmt;
-use std::io;
+use std::{fmt, io};
 
 use ::serde::{Deserialize, Serialize};
 use bimap::BiHashMap;
-
-use crate::FieldId;
-
 pub use builder::DocumentsBuilder;
 pub use reader::DocumentsReader;
+
+use crate::FieldId;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct DocumentsMetadata {
@@ -89,7 +87,6 @@ impl std::error::Error for Error {}
 macro_rules! documents {
     ($data:tt) => {{
         let documents = serde_json::json!($data);
-        println!("{}", documents);
         let mut writer = std::io::Cursor::new(Vec::new());
         let mut builder =
             crate::documents::DocumentsBuilder::new(&mut writer, bimap::BiHashMap::new()).unwrap();
@@ -104,8 +101,9 @@ macro_rules! documents {
 
 #[cfg(test)]
 mod test {
+    use serde_json::{json, Value};
+
     use super::*;
-    use serde_json::json;
 
     #[test]
     fn create_documents_no_errors() {
@@ -168,5 +166,66 @@ mod test {
         assert_eq!(reader.1.iter().count(), 1);
         assert!(documents.next_document_with_index().unwrap().is_some());
         assert!(documents.next_document_with_index().unwrap().is_none());
+    }
+
+    #[test]
+    fn add_documents_array() {
+        let docs = json!([
+            { "toto": false },
+            { "tata": "hello" },
+        ]);
+
+        let mut v = Vec::new();
+        let mut cursor = io::Cursor::new(&mut v);
+
+        let mut builder = DocumentsBuilder::new(&mut cursor, BiHashMap::new()).unwrap();
+
+        builder.add_documents(docs).unwrap();
+
+        builder.finish().unwrap();
+
+        let mut documents =
+            DocumentsReader::from_reader(io::Cursor::new(cursor.into_inner())).unwrap();
+
+        assert_eq!(documents.index().iter().count(), 2);
+
+        let reader = documents.next_document_with_index().unwrap().unwrap();
+
+        assert_eq!(reader.1.iter().count(), 1);
+        assert!(documents.next_document_with_index().unwrap().is_some());
+        assert!(documents.next_document_with_index().unwrap().is_none());
+    }
+
+    #[test]
+    fn add_invalid_document_format() {
+        let mut v = Vec::new();
+        let mut cursor = io::Cursor::new(&mut v);
+
+        let mut builder = DocumentsBuilder::new(&mut cursor, BiHashMap::new()).unwrap();
+
+        let docs = json!([[
+            { "toto": false },
+            { "tata": "hello" },
+        ]]);
+
+        assert!(builder.add_documents(docs).is_err());
+
+        let docs = json!("hello");
+
+        assert!(builder.add_documents(docs).is_err());
+    }
+
+    #[test]
+    fn test_nested() {
+        let mut docs = documents!([{
+            "hello": {
+                "toto": ["hello"]
+            }
+        }]);
+
+        let (_index, doc) = docs.next_document_with_index().unwrap().unwrap();
+
+        let nested: Value = serde_json::from_slice(doc.get(0).unwrap()).unwrap();
+        assert_eq!(nested, json!({ "toto": ["hello"] }));
     }
 }

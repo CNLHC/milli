@@ -1,6 +1,5 @@
 use std::convert::TryInto;
-use std::fmt;
-use std::io;
+use std::{fmt, io};
 
 use bimap::BiHashMap;
 use byteorder::{BigEndian, WriteBytesExt};
@@ -265,8 +264,8 @@ impl<'a, W: io::Write> SerializeMap for MapSerializer<'a, W> {
         V: Serialize,
     {
         let field_serilizer = FieldSerializer { index: &mut self.index };
-
         let field_id: FieldId = key.serialize(field_serilizer)?;
+
         self.buffer.clear();
         let mut cursor = io::Cursor::new(&mut self.buffer);
         serde_json::to_writer(&mut cursor, value).map_err(Error::JsonError)?;
@@ -304,7 +303,6 @@ impl<'a> serde::Serializer for FieldSerializer<'a> {
             }
         };
 
-        println!("key: {}, id: {}", ws, field_id);
         Ok(field_id)
     }
 
