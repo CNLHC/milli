@@ -1,6 +1,7 @@
 [workspace]
-members = ["milli", "http-ui", "benchmarks", "infos", "helpers", "search"]
+members = ["milli", "http-ui", "benchmarks", "infos", "helpers"]
 default-members = ["milli"]
+exclude = ["cli"]
 
 [profile.dev]
 opt-level = 3

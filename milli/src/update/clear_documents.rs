@@ -80,7 +80,7 @@ mod tests {
     use heed::EnvOpenOptions;
 
     use super::*;
-    use crate::update::{IndexDocuments, UpdateFormat};
+    use crate::update::{IndexDocuments};
 
     #[test]
     fn clear_documents() {
@@ -90,13 +90,12 @@ mod tests {
         let index = Index::new(options, &path).unwrap();
 
         let mut wtxn = index.write_txn().unwrap();
-        let content = &br#"[
+        let content = documents!([
             { "id": 0, "name": "kevin", "age": 20 },
             { "id": 1, "name": "kevina" },
             { "id": 2, "name": "benoit", "country": "France" }
-        ]"#[..];
-        let mut builder = IndexDocuments::new(&mut wtxn, &index, 0);
-        builder.update_format(UpdateFormat::Json);
+        ]);
+        let builder = IndexDocuments::new(&mut wtxn, &index, 0);
         builder.execute(content, |_, _| ()).unwrap();
 
         // Clear all documents from the database.

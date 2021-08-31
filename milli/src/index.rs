@@ -807,7 +807,7 @@ pub(crate) mod tests {
     use maplit::btreemap;
     use tempfile::TempDir;
 
-    use crate::update::{IndexDocuments, UpdateFormat};
+    use crate::update::{IndexDocuments};
     use crate::Index;
 
     pub(crate) struct TempIndex {
@@ -843,13 +843,12 @@ pub(crate) mod tests {
         let index = Index::new(options, &path).unwrap();
 
         let mut wtxn = index.write_txn().unwrap();
-        let content = &br#"[
+        let content = documents!([
             { "id": 1, "name": "kevin" },
             { "id": 2, "name": "bob", "age": 20 },
             { "id": 2, "name": "bob", "age": 20 }
-        ]"#[..];
-        let mut builder = IndexDocuments::new(&mut wtxn, &index, 0);
-        builder.update_format(UpdateFormat::Json);
+        ]);
+        let builder = IndexDocuments::new(&mut wtxn, &index, 0);
         builder.execute(content, |_, _| ()).unwrap();
         wtxn.commit().unwrap();
 
@@ -868,8 +867,12 @@ pub(crate) mod tests {
         // we add all the documents a second time. we are supposed to get the same
         // field_distribution in the end
         let mut wtxn = index.write_txn().unwrap();
-        let mut builder = IndexDocuments::new(&mut wtxn, &index, 0);
-        builder.update_format(UpdateFormat::Json);
+        let builder = IndexDocuments::new(&mut wtxn, &index, 0);
+        let content = documents!([
+            { "id": 1, "name": "kevin" },
+            { "id": 2, "name": "bob", "age": 20 },
+            { "id": 2, "name": "bob", "age": 20 }
+        ]);
         builder.execute(content, |_, _| ()).unwrap();
         wtxn.commit().unwrap();
 
@@ -886,13 +889,12 @@ pub(crate) mod tests {
         );
 
         // then we update a document by removing one field and another by adding one field
-        let content = &br#"[
+        let content = documents!([
             { "id": 1, "name": "kevin", "has_dog": true },
             { "id": 2, "name": "bob" }
-        ]"#[..];
+        ]);
         let mut wtxn = index.write_txn().unwrap();
-        let mut builder = IndexDocuments::new(&mut wtxn, &index, 0);
-        builder.update_format(UpdateFormat::Json);
+        let builder = IndexDocuments::new(&mut wtxn, &index, 0);
         builder.execute(content, |_, _| ()).unwrap();
         wtxn.commit().unwrap();
 

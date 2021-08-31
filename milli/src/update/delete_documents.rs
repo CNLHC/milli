@@ -547,7 +547,7 @@ mod tests {
     use maplit::hashset;
 
     use super::*;
-    use crate::update::{IndexDocuments, Settings, UpdateFormat};
+    use crate::update::{IndexDocuments, Settings};
     use crate::FilterCondition;
 
     #[test]
@@ -558,13 +558,12 @@ mod tests {
         let index = Index::new(options, &path).unwrap();
 
         let mut wtxn = index.write_txn().unwrap();
-        let content = &br#"[
+        let content = documents!([
             { "id": 0, "name": "kevin", "object": { "key1": "value1", "key2": "value2" } },
             { "id": 1, "name": "kevina", "array": ["I", "am", "fine"] },
             { "id": 2, "name": "benoit", "array_of_object": [{ "wow": "amazing" }] }
-        ]"#[..];
-        let mut builder = IndexDocuments::new(&mut wtxn, &index, 0);
-        builder.update_format(UpdateFormat::Json);
+        ]);
+        let builder = IndexDocuments::new(&mut wtxn, &index, 0);
         builder.execute(content, |_, _| ()).unwrap();
 
         // delete those documents, ids are synchronous therefore 0, 1, and 2.
@@ -589,13 +588,12 @@ mod tests {
         let index = Index::new(options, &path).unwrap();
 
         let mut wtxn = index.write_txn().unwrap();
-        let content = &br#"[
+        let content = documents!([
             { "mysuperid": 0, "name": "kevin" },
             { "mysuperid": 1, "name": "kevina" },
             { "mysuperid": 2, "name": "benoit" }
-        ]"#[..];
-        let mut builder = IndexDocuments::new(&mut wtxn, &index, 0);
-        builder.update_format(UpdateFormat::Json);
+        ]);
+        let builder = IndexDocuments::new(&mut wtxn, &index, 0);
         builder.execute(content, |_, _| ()).unwrap();
 
         // Delete not all of the documents but some of them.
@@ -620,7 +618,7 @@ mod tests {
         builder.set_filterable_fields(hashset! { S("label") });
         builder.execute(|_, _| ()).unwrap();
 
-        let content = &br#"[
+        let content = documents!([
             {"docid":"1_4","label":"sign"},
             {"docid":"1_5","label":"letter"},
             {"docid":"1_7","label":"abstract,cartoon,design,pattern"},
@@ -641,9 +639,8 @@ mod tests {
             {"docid":"1_58","label":"abstract,art,cartoon"},
             {"docid":"1_68","label":"design"},
             {"docid":"1_69","label":"geometry"}
-        ]"#[..];
-        let mut builder = IndexDocuments::new(&mut wtxn, &index, 0);
-        builder.update_format(UpdateFormat::Json);
+        ]);
+        let builder = IndexDocuments::new(&mut wtxn, &index, 0);
         builder.execute(content, |_, _| ()).unwrap();
 
         // Delete not all of the documents but some of them.

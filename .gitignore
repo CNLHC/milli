@@ -2,6 +2,9 @@
 /target
 /Cargo.lock
 
+/cli/target
+/cli/Cargo.lock
+
 # datasets
 *.csv
 *.mmdb

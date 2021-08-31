@@ -27,21 +27,24 @@ pub trait Distinct {
 #[cfg(test)]
 mod test {
     use std::collections::HashSet;
+    use std::io::Cursor;
 
+    use bimap::BiHashMap;
     use once_cell::sync::Lazy;
     use rand::seq::SliceRandom;
     use rand::Rng;
     use roaring::RoaringBitmap;
     use serde_json::{json, Value};
 
+    use crate::documents::{DocumentsBuilder, DocumentsReader};
     use crate::index::tests::TempIndex;
     use crate::index::Index;
-    use crate::update::{IndexDocumentsMethod, UpdateBuilder, UpdateFormat};
+    use crate::update::{IndexDocumentsMethod, UpdateBuilder};
     use crate::{DocumentId, FieldId, BEU32};
 
-    static JSON: Lazy<Value> = Lazy::new(generate_json);
+    static JSON: Lazy<Vec<u8>> = Lazy::new(generate_json);
 
-    fn generate_json() -> Value {
+    fn generate_json() -> Vec<u8> {
         let mut rng = rand::thread_rng();
         let num_docs = rng.gen_range(10..30);
 
@@ -69,7 +72,13 @@ mod test {
             documents.push(doc);
         }
 
-        Value::Array(documents)
+        let mut cursor = Cursor::new(Vec::new());
+        let mut builder = DocumentsBuilder::new(&mut cursor, BiHashMap::new()).unwrap();
+
+        builder.add_documents(documents).unwrap();
+        builder.finish().unwrap();
+
+        cursor.into_inner()
     }
 
     /// Returns a temporary index populated with random test documents, the FieldId for the
@@ -89,13 +98,14 @@ mod test {
         let mut addition = builder.index_documents(&mut txn, &index);
 
         addition.index_documents_method(IndexDocumentsMethod::ReplaceDocuments);
-        addition.update_format(UpdateFormat::Json);
-        addition.execute(JSON.to_string().as_bytes(), |_, _| ()).unwrap();
+        let reader = crate::documents::DocumentsReader::from_reader(Cursor::new(&*JSON)).unwrap();
+        addition.execute(reader, |_, _| ()).unwrap();
 
         let fields_map = index.fields_ids_map(&txn).unwrap();
         let fid = fields_map.id(&distinct).unwrap();
 
-        let map = (0..JSON.as_array().unwrap().len() as u32).collect();
+        let documents = DocumentsReader::from_reader(Cursor::new(&*JSON)).unwrap();
+        let map = (0..documents.len() as u32).collect();
 
         txn.commit().unwrap();
 
