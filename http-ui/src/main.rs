@@ -1022,7 +1022,7 @@ async fn main() -> anyhow::Result<()> {
 fn documents_from_jsonl(reader: impl io::Read) -> anyhow::Result<Vec<u8>> {
     let mut writer = Cursor::new(Vec::new());
     let mut documents =
-        milli::documents::DocumentsBuilder::new(&mut writer, bimap::BiHashMap::new())?;
+        milli::documents::DocumentsBuilder::new(&mut writer)?;
 
     let values = serde_json::Deserializer::from_reader(reader)
         .into_iter::<serde_json::Map<String, serde_json::Value>>();
@@ -1038,7 +1038,7 @@ fn documents_from_jsonl(reader: impl io::Read) -> anyhow::Result<Vec<u8>> {
 fn documents_from_json(reader: impl io::Read) -> anyhow::Result<Vec<u8>> {
     let mut writer = Cursor::new(Vec::new());
     let mut documents =
-        milli::documents::DocumentsBuilder::new(&mut writer, bimap::BiHashMap::new())?;
+        milli::documents::DocumentsBuilder::new(&mut writer)?;
 
     let json: serde_json::Value = serde_json::from_reader(reader)?;
     documents.add_documents(json)?;
@@ -1050,7 +1050,7 @@ fn documents_from_json(reader: impl io::Read) -> anyhow::Result<Vec<u8>> {
 fn documents_from_csv(reader: impl io::Read) -> anyhow::Result<Vec<u8>> {
     let mut writer = Cursor::new(Vec::new());
     let mut documents =
-        milli::documents::DocumentsBuilder::new(&mut writer, bimap::BiHashMap::new())?;
+        milli::documents::DocumentsBuilder::new(&mut writer)?;
 
     let mut records = csv::Reader::from_reader(reader);
     let iter = records.deserialize::<Map<String, Value>>();

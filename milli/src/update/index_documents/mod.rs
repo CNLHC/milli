@@ -40,6 +40,12 @@ pub struct DocumentAdditionResult {
     pub nb_documents: usize,
 }
 
+#[derive(Debug, Copy, Clone)]
+pub enum WriteMethod {
+    Append,
+    GetMergePut,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum IndexDocumentsMethod {
@@ -50,12 +56,6 @@ pub enum IndexDocumentsMethod {
     /// Merge the previous version of the document with the new version,
     /// replacing old attributes values with the new ones and add the new attributes.
     UpdateDocuments,
-}
-
-#[derive(Debug, Copy, Clone)]
-pub enum WriteMethod {
-    Append,
-    GetMergePut,
 }
 
 pub struct IndexDocuments<'t, 'u, 'i, 'a> {
@@ -143,7 +143,7 @@ impl<'t, 'u, 'i, 'a> IndexDocuments<'t, 'u, 'i, 'a> {
         let update_id = self.update_id;
         let progress_callback = |step| progress_callback(step, update_id);
         let transform = Transform {
-            rtxn: &self.wtxn,
+            rtxn: self.wtxn,
             index: self.index,
             log_every_n: self.log_every_n,
             chunk_compression_type: self.chunk_compression_type,
@@ -423,7 +423,6 @@ mod tests {
     use std::io::Cursor;
 
     use big_s::S;
-    use bimap::BiHashMap;
     use heed::EnvOpenOptions;
 
     use super::*;
@@ -858,7 +857,7 @@ mod tests {
 
         let mut cursor = Cursor::new(Vec::new());
 
-        let mut builder = DocumentsBuilder::new(&mut cursor, BiHashMap::new()).unwrap();
+        let mut builder = DocumentsBuilder::new(&mut cursor).unwrap();
         builder.add_documents(big_object).unwrap();
         builder.finish().unwrap();
         cursor.set_position(0);

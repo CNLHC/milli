@@ -16,10 +16,12 @@ pub use reader::DocumentsReader;
 
 use crate::FieldId;
 
+type AdditionIndex = BiHashMap<FieldId, String>;
+
 #[derive(Debug, Serialize, Deserialize)]
 struct DocumentsMetadata {
     count: usize,
-    index: BiHashMap<FieldId, String>,
+    index: AdditionIndex,
 }
 
 pub struct ByteCounter<W> {
@@ -89,7 +91,7 @@ macro_rules! documents {
         let documents = serde_json::json!($data);
         let mut writer = std::io::Cursor::new(Vec::new());
         let mut builder =
-            crate::documents::DocumentsBuilder::new(&mut writer, bimap::BiHashMap::new()).unwrap();
+            crate::documents::DocumentsBuilder::new(&mut writer).unwrap();
         builder.add_documents(documents).unwrap();
         builder.finish().unwrap();
 
@@ -120,7 +122,7 @@ mod test {
         let mut v = Vec::new();
         let mut cursor = io::Cursor::new(&mut v);
 
-        let mut builder = DocumentsBuilder::new(&mut cursor, BiHashMap::new()).unwrap();
+        let mut builder = DocumentsBuilder::new(&mut cursor).unwrap();
 
         builder.add_documents(json).unwrap();
 
@@ -149,7 +151,7 @@ mod test {
         let mut v = Vec::new();
         let mut cursor = io::Cursor::new(&mut v);
 
-        let mut builder = DocumentsBuilder::new(&mut cursor, BiHashMap::new()).unwrap();
+        let mut builder = DocumentsBuilder::new(&mut cursor).unwrap();
 
         builder.add_documents(doc1).unwrap();
         builder.add_documents(doc2).unwrap();
@@ -178,7 +180,7 @@ mod test {
         let mut v = Vec::new();
         let mut cursor = io::Cursor::new(&mut v);
 
-        let mut builder = DocumentsBuilder::new(&mut cursor, BiHashMap::new()).unwrap();
+        let mut builder = DocumentsBuilder::new(&mut cursor).unwrap();
 
         builder.add_documents(docs).unwrap();
 
@@ -201,7 +203,7 @@ mod test {
         let mut v = Vec::new();
         let mut cursor = io::Cursor::new(&mut v);
 
-        let mut builder = DocumentsBuilder::new(&mut cursor, BiHashMap::new()).unwrap();
+        let mut builder = DocumentsBuilder::new(&mut cursor).unwrap();
 
         let docs = json!([[
             { "toto": false },

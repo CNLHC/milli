@@ -197,12 +197,12 @@ impl<'a, 't, 'u, 'i> Settings<'a, 't, 'u, 'i> {
         let cb = |step| cb(step, update_id);
         // if the settings are set before any document update, we don't need to do anything, and
         // will set the primary key during the first document addition.
-        if self.index.number_of_documents(&self.wtxn)? == 0 {
+        if self.index.number_of_documents(self.wtxn)? == 0 {
             return Ok(());
         }
 
         let transform = Transform {
-            rtxn: &self.wtxn,
+            rtxn: self.wtxn,
             index: self.index,
             log_every_n: self.log_every_n,
             chunk_compression_type: self.chunk_compression_type,
@@ -215,13 +215,13 @@ impl<'a, 't, 'u, 'i> Settings<'a, 't, 'u, 'i> {
 
         // There already has been a document addition, the primary key should be set by now.
         let primary_key =
-            self.index.primary_key(&self.wtxn)?.ok_or(UserError::MissingPrimaryKey)?;
+            self.index.primary_key(self.wtxn)?.ok_or(UserError::MissingPrimaryKey)?;
 
         // We remap the documents fields based on the new `FieldsIdsMap`.
         let output = transform.remap_index_documents(
             primary_key.to_string(),
             old_fields_ids_map,
-            fields_ids_map.clone(),
+            fields_ids_map,
         )?;
 
         // We clear the full database (words-fst, documents ids and documents content).
@@ -260,7 +260,7 @@ impl<'a, 't, 'u, 'i> Settings<'a, 't, 'u, 'i> {
     fn update_distinct_field(&mut self) -> Result<bool> {
         match self.distinct_field {
             Setting::Set(ref attr) => {
-                self.index.put_distinct_field(self.wtxn, &attr)?;
+                self.index.put_distinct_field(self.wtxn, attr)?;
             }
             Setting::Reset => {
                 self.index.delete_distinct_field(self.wtxn)?;
@@ -286,11 +286,11 @@ impl<'a, 't, 'u, 'i> Settings<'a, 't, 'u, 'i> {
                 // Add all the searchable attributes to the field map, and then add the
                 // remaining fields from the old field map to the new one
                 for name in names.iter() {
-                    new_fields_ids_map.insert(&name).ok_or(UserError::AttributeLimitReached)?;
+                    new_fields_ids_map.insert(name).ok_or(UserError::AttributeLimitReached)?;
                 }
 
                 for (_, name) in old_fields_ids_map.iter() {
-                    new_fields_ids_map.insert(&name).ok_or(UserError::AttributeLimitReached)?;
+                    new_fields_ids_map.insert(name).ok_or(UserError::AttributeLimitReached)?;
                 }
 
                 self.index.put_searchable_fields(self.wtxn, &names)?;
@@ -440,7 +440,7 @@ impl<'a, 't, 'u, 'i> Settings<'a, 't, 'u, 'i> {
     fn update_primary_key(&mut self) -> Result<()> {
         match self.primary_key {
             Setting::Set(ref primary_key) => {
-                if self.index.number_of_documents(&self.wtxn)? == 0 {
+                if self.index.number_of_documents(self.wtxn)? == 0 {
                     let mut fields_ids_map = self.index.fields_ids_map(self.wtxn)?;
                     fields_ids_map.insert(primary_key).ok_or(UserError::AttributeLimitReached)?;
                     self.index.put_fields_ids_map(self.wtxn, &fields_ids_map)?;
@@ -451,7 +451,7 @@ impl<'a, 't, 'u, 'i> Settings<'a, 't, 'u, 'i> {
                 }
             }
             Setting::Reset => {
-                if self.index.number_of_documents(&self.wtxn)? == 0 {
+                if self.index.number_of_documents(self.wtxn)? == 0 {
                     self.index.delete_primary_key(self.wtxn)?;
                     Ok(())
                 } else {
@@ -468,8 +468,8 @@ impl<'a, 't, 'u, 'i> Settings<'a, 't, 'u, 'i> {
     {
         self.index.set_updated_at(self.wtxn, &Utc::now())?;
 
-        let old_faceted_fields = self.index.faceted_fields(&self.wtxn)?;
-        let old_fields_ids_map = self.index.fields_ids_map(&self.wtxn)?;
+        let old_faceted_fields = self.index.faceted_fields(self.wtxn)?;
+        let old_fields_ids_map = self.index.fields_ids_map(self.wtxn)?;
 
         self.update_displayed()?;
         self.update_filterable()?;
@@ -481,7 +481,7 @@ impl<'a, 't, 'u, 'i> Settings<'a, 't, 'u, 'i> {
         // If there is new faceted fields we indicate that we must reindex as we must
         // index new fields as facets. It means that the distinct attribute,
         // an Asc/Desc criterion or a filtered attribute as be added or removed.
-        let new_faceted_fields = self.index.faceted_fields(&self.wtxn)?;
+        let new_faceted_fields = self.index.faceted_fields(self.wtxn)?;
         let faceted_updated = old_faceted_fields != new_faceted_fields;
 
         let stop_words_updated = self.update_stop_words()?;

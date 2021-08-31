@@ -66,10 +66,10 @@ fn create_fields_mapping(
         // we sort by id here to ensure a deterministic mapping of the fields, that preserves
         // the original ordering.
         .sorted_by_key(|(&id, _)| id)
-        .map(|(field, name)| match fields_id_map.id(&name) {
+        .map(|(field, name)| match fields_id_map.id(name) {
             Some(id) => Ok((*field, id)),
             None => fields_id_map
-                .insert(&name)
+                .insert(name)
                 .ok_or(Error::UserError(UserError::AttributeLimitReached))
                 .map(|id| (*field, id)),
         })
@@ -163,9 +163,9 @@ impl Transform<'_, '_> {
                             }
                         },
                         Value::Number(number) => number.to_string(),
-                        content => {
+                        document_id => {
                             return Err(UserError::InvalidDocumentId {
-                                document_id: content.clone(),
+                                document_id,
                             }
                             .into())
                         }
@@ -179,7 +179,7 @@ impl Transform<'_, '_> {
                         let mut json = Map::new();
                         for (key, value) in document.iter() {
                             let key = addition_index.get_by_left(&key).cloned();
-                            let value = serde_json::from_slice::<Value>(&value).ok();
+                            let value = serde_json::from_slice::<Value>(value).ok();
 
                             if let Some((k, v)) = key.zip(value) {
                                 json.insert(k, v);
@@ -199,7 +199,7 @@ impl Transform<'_, '_> {
             // Insertion in a obkv need to be done with keys ordered. For now they are ordered
             // according to the document addition key order, so we sort it according to the
             // fieldids map keys order.
-            field_buffer.sort_unstable_by(|(f1, _), (f2, _)| f1.cmp(&f2));
+            field_buffer.sort_unstable_by(|(f1, _), (f2, _)| f1.cmp(f2));
 
             // The last step is to build the new new obkv document, and insert it in the sorter.
             let mut writer = obkv::KvWriter::new(&mut obkv_buffer);
@@ -291,7 +291,7 @@ impl Transform<'_, '_> {
                     replaced_documents_ids.insert(docid);
 
                     let key = BEU32::new(docid);
-                    let base_obkv = self.index.documents.get(&self.rtxn, &key)?.ok_or(
+                    let base_obkv = self.index.documents.get(self.rtxn, &key)?.ok_or(
                         InternalError::DatabaseMissingEntry {
                             db_name: db_name::DOCUMENTS,
                             key: None,

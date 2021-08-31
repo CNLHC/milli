@@ -218,7 +218,7 @@ impl Index {
     /// Writes the documents primary key, this is the field name that is used to store the id.
     pub(crate) fn put_primary_key(&self, wtxn: &mut RwTxn, primary_key: &str) -> heed::Result<()> {
         self.set_updated_at(wtxn, &Utc::now())?;
-        self.main.put::<_, Str, Str>(wtxn, main_key::PRIMARY_KEY_KEY, &primary_key)
+        self.main.put::<_, Str, Str>(wtxn, main_key::PRIMARY_KEY_KEY, primary_key)
     }
 
     /// Deletes the primary key of the documents, this can be done to reset indexes settings.
@@ -741,7 +741,7 @@ impl Index {
             let kv = self
                 .documents
                 .get(rtxn, &BEU32::new(id))?
-                .ok_or_else(|| UserError::UnknownInternalDocumentId { document_id: id })?;
+                .ok_or(UserError::UnknownInternalDocumentId { document_id: id })?;
             documents.push((id, kv));
         }
 
@@ -795,7 +795,7 @@ impl Index {
         wtxn: &mut RwTxn,
         time: &DateTime<Utc>,
     ) -> heed::Result<()> {
-        self.main.put::<_, Str, SerdeJson<DateTime<Utc>>>(wtxn, main_key::UPDATED_AT_KEY, &time)
+        self.main.put::<_, Str, SerdeJson<DateTime<Utc>>>(wtxn, main_key::UPDATED_AT_KEY, time)
     }
 }
 

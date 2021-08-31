@@ -2,11 +2,10 @@ use std::io;
 use std::io::{BufReader, Read};
 use std::mem::size_of;
 
-use bimap::BiHashMap;
 use byteorder::{BigEndian, ReadBytesExt};
 use obkv::KvReader;
 
-use super::{DocumentsMetadata, Error};
+use super::{DocumentsMetadata, Error, AdditionIndex};
 use crate::FieldId;
 
 pub struct DocumentsReader<R> {
@@ -39,9 +38,9 @@ impl<R: io::Read + io::Seek> DocumentsReader<R> {
 
     /// Returns the next document in the reader, and wraps it in an `obkv::KvReader`, along with a
     /// reference to the addition index.
-    pub fn next_document_with_index<'a>(
-        &'a mut self,
-    ) -> io::Result<Option<(&'a BiHashMap<FieldId, String>, KvReader<'a, FieldId>)>> {
+    pub fn next_document_with_index(
+        &mut self,
+    ) -> io::Result<Option<(&AdditionIndex, KvReader<FieldId>)>> {
         if self.seen_documents < self.metadata.count {
             let doc_len = self.reader.read_u32::<BigEndian>()?;
             self.buffer.resize(doc_len as usize, 0);
@@ -56,7 +55,7 @@ impl<R: io::Read + io::Seek> DocumentsReader<R> {
     }
 
     /// Return the fields index for the documents batch.
-    pub fn index(&self) -> &BiHashMap<FieldId, String> {
+    pub fn index(&self) -> &AdditionIndex {
         &self.metadata.index
     }
 

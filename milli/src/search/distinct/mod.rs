@@ -29,7 +29,6 @@ mod test {
     use std::collections::HashSet;
     use std::io::Cursor;
 
-    use bimap::BiHashMap;
     use once_cell::sync::Lazy;
     use rand::seq::SliceRandom;
     use rand::Rng;
@@ -49,7 +48,7 @@ mod test {
         let num_docs = rng.gen_range(10..30);
 
         let mut cursor = Cursor::new(Vec::new());
-        let mut builder = DocumentsBuilder::new(&mut cursor, BiHashMap::new()).unwrap();
+        let mut builder = DocumentsBuilder::new(&mut cursor).unwrap();
         let txts = ["Toto", "Titi", "Tata"];
         let cats = (1..10).map(|i| i.to_string()).collect::<Vec<_>>();
         let cat_ints = (1..10).collect::<Vec<_>>();

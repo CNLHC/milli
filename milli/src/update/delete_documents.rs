@@ -79,11 +79,10 @@ impl<'t, 'u, 'i> DeleteDocuments<'t, 'u, 'i> {
         }
 
         let fields_ids_map = self.index.fields_ids_map(self.wtxn)?;
-        let primary_key = self.index.primary_key(self.wtxn)?.ok_or_else(|| {
+        let primary_key = self.index.primary_key(self.wtxn)?.ok_or(
             InternalError::DatabaseMissingEntry {
                 db_name: db_name::MAIN,
                 key: Some(main_key::PRIMARY_KEY_KEY),
-            }
         })?;
 
         // If we can't find the id of the primary key it means that the database
@@ -196,7 +195,7 @@ impl<'t, 'u, 'i> DeleteDocuments<'t, 'u, 'i> {
             // We create an iterator to be able to get the content and delete the word docids.
             // It's faster to acquire a cursor to get and delete or put, as we avoid traversing
             // the LMDB B-Tree two times but only once.
-            let mut iter = word_docids.prefix_iter_mut(self.wtxn, &word)?;
+            let mut iter = word_docids.prefix_iter_mut(self.wtxn, word)?;
             if let Some((key, mut docids)) = iter.next().transpose()? {
                 if key == word.as_ref() {
                     let previous_len = docids.len();
@@ -469,7 +468,7 @@ fn remove_docids_from_facet_field_id_string_docids<'a, C, D>(
                 // level key. We must then parse the value using the appropriate codec.
                 let (group, mut docids) =
                     FacetStringZeroBoundsValueCodec::<CboRoaringBitmapCodec>::bytes_decode(val)
-                        .ok_or_else(|| SerializationError::Decoding { db_name })?;
+                        .ok_or(SerializationError::Decoding { db_name })?;
 
                 let previous_len = docids.len();
                 docids -= to_remove;
@@ -481,7 +480,7 @@ fn remove_docids_from_facet_field_id_string_docids<'a, C, D>(
                     let val = &(group, docids);
                     let value_bytes =
                         FacetStringZeroBoundsValueCodec::<CboRoaringBitmapCodec>::bytes_encode(val)
-                            .ok_or_else(|| SerializationError::Encoding { db_name })?;
+                            .ok_or(SerializationError::Encoding { db_name })?;
 
                     // safety: we don't keep references from inside the LMDB database.
                     unsafe { iter.put_current(&key, &value_bytes)? };
@@ -491,7 +490,7 @@ fn remove_docids_from_facet_field_id_string_docids<'a, C, D>(
                 // The key corresponds to a level zero facet string.
                 let (original_value, mut docids) =
                     FacetStringLevelZeroValueCodec::bytes_decode(val)
-                        .ok_or_else(|| SerializationError::Decoding { db_name })?;
+                        .ok_or(SerializationError::Decoding { db_name })?;
 
                 let previous_len = docids.len();
                 docids -= to_remove;
@@ -502,7 +501,7 @@ fn remove_docids_from_facet_field_id_string_docids<'a, C, D>(
                     let key = key.to_owned();
                     let val = &(original_value, docids);
                     let value_bytes = FacetStringLevelZeroValueCodec::bytes_encode(val)
-                        .ok_or_else(|| SerializationError::Encoding { db_name })?;
+                        .ok_or(SerializationError::Encoding { db_name })?;
 
                     // safety: we don't keep references from inside the LMDB database.
                     unsafe { iter.put_current(&key, &value_bytes)? };

@@ -1,18 +1,17 @@
 use std::convert::TryInto;
 use std::{fmt, io};
 
-use bimap::BiHashMap;
 use byteorder::{BigEndian, WriteBytesExt};
 use obkv::KvWriter;
 use serde::ser::{Impossible, Serialize, SerializeMap, SerializeSeq, Serializer};
 
-use super::{ByteCounter, Error};
+use super::{AdditionIndex, ByteCounter, Error};
 use crate::FieldId;
 
 pub struct DocumentsSerilializer<W> {
     pub writer: ByteCounter<W>,
     pub buffer: Vec<u8>,
-    pub index: BiHashMap<FieldId, String>,
+    pub index: AdditionIndex,
     pub count: usize,
     pub allow_seq: bool,
 }
@@ -225,7 +224,7 @@ impl<'a, W: io::Write> SerializeSeq for SeqSerializer<'a, W> {
 
 pub struct MapSerializer<'a, W> {
     map: KvWriter<io::Cursor<&'a mut Vec<u8>>, FieldId>,
-    index: &'a mut BiHashMap<FieldId, String>,
+    index: &'a mut AdditionIndex,
     writer: W,
     buffer: Vec<u8>,
 }
@@ -249,7 +248,7 @@ impl<'a, W: io::Write> SerializeMap for MapSerializer<'a, W> {
         let data_len: u32 = data.len().try_into().map_err(|_| Error::DocumentTooLarge)?;
 
         self.writer.write_u32::<BigEndian>(data_len).map_err(Error::Io)?;
-        self.writer.write_all(&data).map_err(Error::Io)?;
+        self.writer.write_all(data).map_err(Error::Io)?;
 
         Ok(())
     }
@@ -277,7 +276,7 @@ impl<'a, W: io::Write> SerializeMap for MapSerializer<'a, W> {
 }
 
 struct FieldSerializer<'a> {
-    index: &'a mut BiHashMap<FieldId, String>,
+    index: &'a mut AdditionIndex,
 }
 
 impl<'a> serde::Serializer for FieldSerializer<'a> {
