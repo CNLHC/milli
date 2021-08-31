@@ -5,9 +5,9 @@ mod typed_chunk;
 
 use std::collections::HashSet;
 use std::iter::FromIterator;
-use std::io::{Seek, Read};
 use std::num::{NonZeroU32, NonZeroUsize};
 use std::time::Instant;
+use std::io::{Read, Seek};
 
 use chrono::Utc;
 use crossbeam_channel::{Receiver, Sender};
@@ -24,12 +24,12 @@ pub use self::helpers::{
 };
 use self::helpers::{grenad_obkv_into_chunks, GrenadParameters};
 pub use self::transform::{Transform, TransformOutput};
+use crate::{Index, Result};
+use crate::documents::DocumentsReader;
 use crate::update::{
     Facets, UpdateBuilder, UpdateIndexingStep, WordPrefixDocids, WordPrefixPairProximityDocids,
     WordsLevelPositions, WordsPrefixesFst,
 };
-use crate::{Index, Result};
-use crate::documents::DocumentsReader;
 
 static MERGED_DATABASE_COUNT: usize = 7;
 static PREFIX_DATABASE_COUNT: usize = 5;
@@ -124,7 +124,11 @@ impl<'t, 'u, 'i, 'a> IndexDocuments<'t, 'u, 'i, 'a> {
     }
 
     #[logging_timer::time("IndexDocuments::{}")]
-    pub fn execute<R, F>(self, reader: DocumentsReader<R>, progress_callback: F) -> Result<DocumentAdditionResult>
+    pub fn execute<R, F>(
+        self,
+        reader: DocumentsReader<R>,
+        progress_callback: F,
+    ) -> Result<DocumentAdditionResult>
     where
         R: Read + Seek,
         F: Fn(UpdateIndexingStep, u64) + Sync,
@@ -616,8 +620,7 @@ mod tests {
 
         let docs = index.documents(&rtxn, vec![0, 1, 2]).unwrap();
         let (kevin_id, _) =
-            docs.iter().find(|(_, d)| d.get(0).unwrap() == br#""updated kevin""#)
-            .unwrap();
+            docs.iter().find(|(_, d)| d.get(0).unwrap() == br#""updated kevin""#).unwrap();
         let (id, doc) = docs[*kevin_id as usize];
         assert_eq!(id, *kevin_id);
 

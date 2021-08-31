@@ -807,7 +807,7 @@ pub(crate) mod tests {
     use maplit::btreemap;
     use tempfile::TempDir;
 
-    use crate::update::{IndexDocuments};
+    use crate::update::IndexDocuments;
     use crate::Index;
 
     pub(crate) struct TempIndex {

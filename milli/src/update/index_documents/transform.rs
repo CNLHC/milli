@@ -6,11 +6,11 @@ use std::io::{Read, Seek, SeekFrom};
 use std::time::Instant;
 
 use grenad::CompressionType;
+use itertools::Itertools;
 use log::info;
 use roaring::RoaringBitmap;
 use serde_json::{Map, Value};
 use smallvec::SmallVec;
-use itertools::Itertools;
 
 use super::helpers::{
     create_sorter, create_writer, keep_latest_obkv, merge_obkvs, merge_two_obkvs, MergeFn,
@@ -84,7 +84,11 @@ fn find_primary_key(index: &bimap::BiHashMap<u16, String>) -> Option<&str> {
 }
 
 impl Transform<'_, '_> {
-    pub fn read_documents<R, F>(self, mut reader: DocumentsReader<R>, progress_callback: F) -> Result<TransformOutput>
+    pub fn read_documents<R, F>(
+        self,
+        mut reader: DocumentsReader<R>,
+        progress_callback: F,
+    ) -> Result<TransformOutput>
     where
         R: Read + Seek,
         F: Fn(UpdateIndexingStep) + Sync,
@@ -93,7 +97,9 @@ impl Transform<'_, '_> {
         let mut fields_ids_map = self.index.fields_ids_map(self.rtxn)?;
         let mapping = create_fields_mapping(&mut fields_ids_map, fields_index)?;
 
-        let alternative_name = self.index.primary_key(self.rtxn)?
+        let alternative_name = self
+            .index
+            .primary_key(self.rtxn)?
             .or_else(|| find_primary_key(fields_index))
             .map(String::from);
 
@@ -123,7 +129,6 @@ impl Transform<'_, '_> {
         let mut obkv_buffer = Vec::new();
         let mut documents_count = 0;
         while let Some((addition_index, document)) = reader.next_document_with_index()? {
-
             if self.log_every_n.map_or(false, |len| documents_count % len == 0) {
                 progress_callback(UpdateIndexingStep::RemapDocumentAddition {
                     documents_seen: documents_count,
@@ -147,18 +152,22 @@ impl Transform<'_, '_> {
             let external_id = match field_buffer.iter_mut().find(|(id, _)| *id == primary_key_id) {
                 Some((_, bytes)) => {
                     let value = match serde_json::from_slice(bytes).unwrap() {
-                        Value::String(string) => {
-                            match validate_document_id(&string) {
-                                Some(s) if s.len() == string.len() => string,
-                                Some(s) => s.to_string(),
-                                None => return Err(UserError::InvalidDocumentId { document_id: Value::String(string) }.into())
+                        Value::String(string) => match validate_document_id(&string) {
+                            Some(s) if s.len() == string.len() => string,
+                            Some(s) => s.to_string(),
+                            None => {
+                                return Err(UserError::InvalidDocumentId {
+                                    document_id: Value::String(string),
+                                }
+                                .into())
                             }
                         },
                         Value::Number(number) => number.to_string(),
                         content => {
-                            return Err(
-                                UserError::InvalidDocumentId { document_id: content.clone() }.into()
-                            )
+                            return Err(UserError::InvalidDocumentId {
+                                document_id: content.clone(),
+                            }
+                            .into())
                         }
                     };
                     serde_json::to_writer(&mut external_id_buffer, &value).unwrap();

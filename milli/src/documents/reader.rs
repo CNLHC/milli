@@ -2,9 +2,9 @@ use std::io;
 use std::io::{BufReader, Read};
 use std::mem::size_of;
 
+use bimap::BiHashMap;
 use byteorder::{BigEndian, ReadBytesExt};
 use obkv::KvReader;
-use bimap::BiHashMap;
 
 use super::{DocumentsMetadata, Error};
 use crate::FieldId;
@@ -34,18 +34,14 @@ impl<R: io::Read + io::Seek> DocumentsReader<R> {
 
         let reader = BufReader::new(reader);
 
-        Ok(Self {
-            reader,
-            metadata,
-            buffer,
-            seen_documents: 0,
-        })
+        Ok(Self { reader, metadata, buffer, seen_documents: 0 })
     }
-
 
     /// Returns the next document in the reader, and wraps it in an `obkv::KvReader`, along with a
     /// reference to the addition index.
-    pub fn next_document_with_index<'a>(&'a mut self) -> io::Result<Option<(&'a BiHashMap<FieldId, String>, KvReader<'a, FieldId>)>> {
+    pub fn next_document_with_index<'a>(
+        &'a mut self,
+    ) -> io::Result<Option<(&'a BiHashMap<FieldId, String>, KvReader<'a, FieldId>)>> {
         if self.seen_documents < self.metadata.count {
             let doc_len = self.reader.read_u32::<BigEndian>()?;
             self.buffer.resize(doc_len as usize, 0);

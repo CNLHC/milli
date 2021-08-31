@@ -1,11 +1,11 @@
 use std::io::{self, Write};
 
-use byteorder::{BigEndian, WriteBytesExt};
 use bimap::BiHashMap;
+use byteorder::{BigEndian, WriteBytesExt};
 use serde::ser::Serialize;
 
-use super::{Error, ByteCounter, DocumentsMetadata};
 use super::serde::DocumentsSerilializer;
+use super::{ByteCounter, DocumentsMetadata, Error};
 use crate::FieldId;
 
 pub struct DocumentsBuilder<W> {
@@ -19,13 +19,8 @@ impl<W: io::Write + io::Seek> DocumentsBuilder<W> {
         // add space to write the offset of the metadata at the end of the writer
         writer.write_u64::<BigEndian>(0)?;
 
-        let serializer = DocumentsSerilializer {
-            writer,
-            buffer: Vec::new(),
-            index,
-            count: 0,
-            allow_seq: true,
-        };
+        let serializer =
+            DocumentsSerilializer { writer, buffer: Vec::new(), index, count: 0, allow_seq: true };
 
         Ok(Self { serializer })
     }
@@ -39,20 +34,13 @@ impl<W: io::Write + io::Seek> DocumentsBuilder<W> {
     /// file.
     pub fn finish(self) -> Result<(), Error> {
         let DocumentsSerilializer {
-            writer:
-                ByteCounter {
-                    mut writer,
-                    count: offset,
-                },
+            writer: ByteCounter { mut writer, count: offset },
             index,
             count,
             ..
         } = self.serializer;
 
-        let meta = DocumentsMetadata {
-            count,
-            index,
-        };
+        let meta = DocumentsMetadata { count, index };
 
         bincode::serialize_into(&mut writer, &meta)?;
 
@@ -75,9 +63,7 @@ impl<W: io::Write + io::Seek> DocumentsBuilder<W> {
     /// index provided in the constructor is correct.
     pub fn add_raw_document(&mut self, document: impl AsRef<[u8]>) -> Result<(), Error> {
         let document = document.as_ref();
-        self.serializer
-            .writer
-            .write_u32::<BigEndian>(document.len() as u32)?;
+        self.serializer.writer.write_u32::<BigEndian>(document.len() as u32)?;
         self.serializer.writer.write_all(document)?;
         self.serializer.count += 1;
         Ok(())

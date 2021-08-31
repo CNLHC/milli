@@ -1,23 +1,22 @@
+mod builder;
 /// The documents module defines an intermediary document format that milli uses for indexation, and
 /// provides an API to easily build and read such documents.
 ///
 /// The `DocumentBuilder` interface allows to write batches of documents to a writer, that can
 /// later be read by milli using the `DocumentsReader` interface.
-
 mod reader;
-mod builder;
 mod serde;
 
-use std::io;
 use std::fmt;
+use std::io;
 
+use ::serde::{Deserialize, Serialize};
 use bimap::BiHashMap;
-use ::serde::{Serialize, Deserialize};
 
 use crate::FieldId;
 
-pub use reader::DocumentsReader;
 pub use builder::DocumentsBuilder;
+pub use reader::DocumentsReader;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct DocumentsMetadata {
@@ -88,20 +87,19 @@ impl std::error::Error for Error {}
 /// Macro used to generate documents, with the same syntax as `serde_json::json`
 #[cfg(test)]
 macro_rules! documents {
-    ($data:tt) => {
-        {
-            let documents = serde_json::json!($data);
-            println!("{}", documents);
-            let mut writer = std::io::Cursor::new(Vec::new());
-            let mut builder = crate::documents::DocumentsBuilder::new(&mut writer, bimap::BiHashMap::new()).unwrap();
-            builder.add_documents(documents).unwrap();
-            builder.finish().unwrap();
+    ($data:tt) => {{
+        let documents = serde_json::json!($data);
+        println!("{}", documents);
+        let mut writer = std::io::Cursor::new(Vec::new());
+        let mut builder =
+            crate::documents::DocumentsBuilder::new(&mut writer, bimap::BiHashMap::new()).unwrap();
+        builder.add_documents(documents).unwrap();
+        builder.finish().unwrap();
 
-            writer.set_position(0);
+        writer.set_position(0);
 
-            crate::documents::DocumentsReader::from_reader(writer).unwrap()
-        }
-    };
+        crate::documents::DocumentsReader::from_reader(writer).unwrap()
+    }};
 }
 
 #[cfg(test)]
@@ -130,7 +128,8 @@ mod test {
 
         builder.finish().unwrap();
 
-        let mut documents = DocumentsReader::from_reader(io::Cursor::new(cursor.into_inner())).unwrap();
+        let mut documents =
+            DocumentsReader::from_reader(io::Cursor::new(cursor.into_inner())).unwrap();
 
         assert_eq!(documents.index().iter().count(), 5);
 
@@ -159,12 +158,12 @@ mod test {
 
         builder.finish().unwrap();
 
-        let mut documents = DocumentsReader::from_reader(io::Cursor::new(cursor.into_inner())).unwrap();
+        let mut documents =
+            DocumentsReader::from_reader(io::Cursor::new(cursor.into_inner())).unwrap();
 
         assert_eq!(documents.index().iter().count(), 2);
 
         let reader = documents.next_document_with_index().unwrap().unwrap();
-
 
         assert_eq!(reader.1.iter().count(), 1);
         assert!(documents.next_document_with_index().unwrap().is_some());

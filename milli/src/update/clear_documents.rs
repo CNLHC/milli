@@ -80,7 +80,7 @@ mod tests {
     use heed::EnvOpenOptions;
 
     use super::*;
-    use crate::update::{IndexDocuments};
+    use crate::update::IndexDocuments;
 
     #[test]
     fn clear_documents() {

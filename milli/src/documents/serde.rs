@@ -1,13 +1,13 @@
+use std::convert::TryInto;
 use std::fmt;
 use std::io;
-use std::convert::TryInto;
 
 use bimap::BiHashMap;
-use obkv::KvWriter;
-use serde::ser::{Impossible, Serialize, SerializeMap, Serializer, SerializeSeq};
 use byteorder::{BigEndian, WriteBytesExt};
+use obkv::KvWriter;
+use serde::ser::{Impossible, Serialize, SerializeMap, SerializeSeq, Serializer};
 
-use super::{Error, ByteCounter};
+use super::{ByteCounter, Error};
 use crate::FieldId;
 
 pub struct DocumentsSerilializer<W> {
@@ -52,7 +52,6 @@ impl<'a, W: io::Write> Serializer for &'a mut DocumentsSerilializer<W> {
         } else {
             Err(Error::InvalidDocumentFormat)
         }
-
     }
 
     fn serialize_bool(self, _v: bool) -> Result<Self::Ok, Self::Error> {
@@ -205,7 +204,7 @@ impl<'a, W: io::Write> Serializer for &'a mut DocumentsSerilializer<W> {
 }
 
 pub struct SeqSerializer<'a, W> {
-    serializer: &'a mut DocumentsSerilializer<W>
+    serializer: &'a mut DocumentsSerilializer<W>,
 }
 
 impl<'a, W: io::Write> SerializeSeq for SeqSerializer<'a, W> {
@@ -214,9 +213,10 @@ impl<'a, W: io::Write> SerializeSeq for SeqSerializer<'a, W> {
 
     fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: Serialize {
-            value.serialize(&mut *self.serializer)?;
-            Ok(())
+        T: Serialize,
+    {
+        value.serialize(&mut *self.serializer)?;
+        Ok(())
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {

@@ -1,13 +1,15 @@
-use std::{path::PathBuf, str::FromStr};
-use std::io::{Cursor, Read, stdin};
 use std::fs::File;
+use std::io::{stdin, Cursor, Read};
+use std::{path::PathBuf, str::FromStr};
 
-use milli::update::UpdateIndexingStep::{ComputeIdsAndMergeDocuments, IndexDocuments, MergeDataIntoFinalDatabase, RemapDocumentAddition};
+use byte_unit::Byte;
+use eyre::Result;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use milli::update::UpdateIndexingStep::{
+    ComputeIdsAndMergeDocuments, IndexDocuments, MergeDataIntoFinalDatabase, RemapDocumentAddition,
+};
 use serde_json::{Map, Value};
 use structopt::StructOpt;
-use eyre::Result;
-use byte_unit::Byte;
-use indicatif::{ProgressBar, MultiProgress, ProgressStyle};
 
 #[cfg(target_os = "linux")]
 #[global_allocator]
@@ -18,7 +20,7 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 struct Cli {
     #[structopt(short, long)]
     index_path: PathBuf,
-    #[structopt(short="s", long, default_value="100GiB")]
+    #[structopt(short = "s", long, default_value = "100GiB")]
     index_size: Byte,
     /// Verbose mode (-v, -vv, -vvv, etc.)
     #[structopt(short, long, parse(from_occurrences))]
@@ -42,7 +44,6 @@ fn setup(opt: &Cli) -> eyre::Result<()> {
         .timestamp(stderrlog::Timestamp::Off)
         .init()?;
     Ok(())
-
 }
 
 fn main() -> Result<()> {
@@ -57,8 +58,8 @@ fn main() -> Result<()> {
     match command.subcommand {
         Command::DocumentAddition(addition) => addition.perform(index)?,
         Command::Search(search) => search.perform(index)?,
-        Command::SettingsUpdate(update) => update.perform(index)?, }
-
+        Command::SettingsUpdate(update) => update.perform(index)?,
+    }
 
     Ok(())
 }
@@ -85,7 +86,7 @@ impl FromStr for DocumentAdditionFormat {
 
 #[derive(Debug, StructOpt)]
 struct DocumentAddition {
-    #[structopt(short, long, default_value="json")]
+    #[structopt(short, long, default_value = "json")]
     format: DocumentAdditionFormat,
     /// Path of the update file, if not present, will read from stdin.
     #[structopt(short, long)]
@@ -139,7 +140,9 @@ impl DocumentAddition {
             bars.push(bar);
         }
 
-        std::thread::spawn(move || { progesses.join().unwrap(); });
+        std::thread::spawn(move || {
+            progesses.join().unwrap();
+        });
 
         let result = addition.execute(reader, |step, _| indexing_callback(step, &bars))?;
 
@@ -169,34 +172,36 @@ fn indexing_callback(step: milli::update::UpdateIndexingStep, bars: &[ProgressBa
         RemapDocumentAddition { documents_seen } => {
             bar.set_style(ProgressStyle::default_spinner());
             bar.set_message(format!("remaped {} documents so far.", documents_seen));
-        },
+        }
         ComputeIdsAndMergeDocuments { documents_seen, total_documents } => {
             bar.set_style(style);
             bar.set_length(total_documents as u64);
             bar.set_message("Merging documents...");
             bar.set_position(documents_seen as u64);
-        },
+        }
         IndexDocuments { documents_seen, total_documents } => {
             bar.set_style(style);
             bar.set_length(total_documents as u64);
             bar.set_message("Indexing documents...");
             bar.set_position(documents_seen as u64);
-        },
+        }
         MergeDataIntoFinalDatabase { databases_seen, total_databases } => {
             bar.set_style(style);
             bar.set_length(total_databases as u64);
             bar.set_message("Merging databases...");
             bar.set_position(databases_seen as u64);
-        },
+        }
     }
     bar.enable_steady_tick(200);
 }
 
 fn documents_from_jsonl(reader: impl Read) -> Result<Vec<u8>> {
     let mut writer = Cursor::new(Vec::new());
-    let mut documents = milli::documents::DocumentsBuilder::new(&mut writer, bimap::BiHashMap::new())?;
+    let mut documents =
+        milli::documents::DocumentsBuilder::new(&mut writer, bimap::BiHashMap::new())?;
 
-    let values = serde_json::Deserializer::from_reader(reader).into_iter::<serde_json::Map<String, serde_json::Value>>();
+    let values = serde_json::Deserializer::from_reader(reader)
+        .into_iter::<serde_json::Map<String, serde_json::Value>>();
     for document in values {
         let document = document?;
         documents.add_documents(document)?;
@@ -210,7 +215,8 @@ fn documents_from_jsonl(reader: impl Read) -> Result<Vec<u8>> {
 
 fn documents_from_json(reader: impl Read) -> Result<Vec<u8>> {
     let mut writer = Cursor::new(Vec::new());
-    let mut documents = milli::documents::DocumentsBuilder::new(&mut writer, bimap::BiHashMap::new())?;
+    let mut documents =
+        milli::documents::DocumentsBuilder::new(&mut writer, bimap::BiHashMap::new())?;
 
     let json: serde_json::Value = serde_json::from_reader(reader)?;
     documents.add_documents(json)?;
@@ -221,7 +227,8 @@ fn documents_from_json(reader: impl Read) -> Result<Vec<u8>> {
 
 fn documents_from_csv(reader: impl Read) -> Result<Vec<u8>> {
     let mut writer = Cursor::new(Vec::new());
-    let mut documents = milli::documents::DocumentsBuilder::new(&mut writer, bimap::BiHashMap::new())?;
+    let mut documents =
+        milli::documents::DocumentsBuilder::new(&mut writer, bimap::BiHashMap::new())?;
 
     let mut records = csv::Reader::from_reader(reader);
     let iter = records.deserialize::<Map<String, Value>>();
@@ -272,13 +279,13 @@ impl Search {
         let result = search.execute()?;
 
         let fields_ids_map = index.fields_ids_map(&txn)?;
-        let displayed_fields = index.displayed_fields_ids(&txn)?.unwrap_or_else(|| fields_ids_map.ids().collect());
+        let displayed_fields =
+            index.displayed_fields_ids(&txn)?.unwrap_or_else(|| fields_ids_map.ids().collect());
         let documents = index.documents(&txn, result.documents_ids)?;
         let mut jsons = Vec::new();
         for (_, obkv) in documents {
             let json = milli::obkv_to_json(&displayed_fields, &fields_ids_map, obkv)?;
             jsons.push(json);
-
         }
 
         let hits = serde_json::to_string_pretty(&jsons)?;
@@ -318,7 +325,9 @@ impl SettingsUpdate {
             bars.push(bar);
         }
 
-        std::thread::spawn(move || { progesses.join().unwrap(); });
+        std::thread::spawn(move || {
+            progesses.join().unwrap();
+        });
 
         update.execute(|step, _| indexing_callback(step, &bars))?;
 

@@ -715,9 +715,9 @@ mod tests {
         println!("fidmap: {:?}", fidmap);
         for document in index.all_documents(&rtxn).unwrap() {
             let document = document.unwrap();
-            let json = crate::obkv_to_json(&fidmap.ids().collect::<Vec<_>>(), &fidmap, document.1).unwrap();
+            let json = crate::obkv_to_json(&fidmap.ids().collect::<Vec<_>>(), &fidmap, document.1)
+                .unwrap();
             println!("json: {:?}", json);
-
         }
         let count = index
             .facet_id_f64_docids
