@@ -406,6 +406,7 @@ impl Transform<'_, '_> {
         let mut documents_count = 0;
         let mut iter = sorter.into_merger_iter()?;
         while let Some((external_id, update_obkv)) = iter.next()? {
+            dbg!();
             if self.log_every_n.map_or(false, |len| documents_count % len == 0) {
                 progress_callback(UpdateIndexingStep::ComputeIdsAndMergeDocuments {
                     documents_seen: documents_count,
@@ -413,12 +414,15 @@ impl Transform<'_, '_> {
                 });
             }
 
+            dbg!();
             let (docid, obkv) = match external_documents_ids.get(external_id) {
                 Some(docid) => {
                     // If we find the user id in the current external documents ids map
                     // we use it and insert it in the list of replaced documents.
+                    dbg!();
                     replaced_documents_ids.insert(docid);
 
+                    dbg!();
                     let key = BEU32::new(docid);
                     let base_obkv = self.index.documents.get(&self.rtxn, &key)?.ok_or(
                         InternalError::DatabaseMissingEntry {
@@ -427,6 +431,7 @@ impl Transform<'_, '_> {
                         },
                     )?;
 
+                    dbg!();
                     // we remove all the fields that were already counted
                     for (field_id, _) in base_obkv.iter() {
                         let field_name = fields_ids_map.name(field_id).unwrap();
@@ -439,6 +444,7 @@ impl Transform<'_, '_> {
                             };
                         }
                     }
+                    dbg!();
 
                     // Depending on the update indexing method we will merge
                     // the document update with the current document or not.
@@ -452,31 +458,37 @@ impl Transform<'_, '_> {
                     }
                 }
                 None => {
+                    dbg!();
                     // If this user id is new we add it to the external documents ids map
                     // for new ids and into the list of new documents.
                     let new_docid =
                         available_documents_ids.next().ok_or(UserError::DocumentLimitReached)?;
                     new_external_documents_ids_builder.insert(external_id, new_docid as u64)?;
                     new_documents_ids.insert(new_docid);
+                    dbg!();
                     (new_docid, update_obkv)
                 }
             };
 
+            dbg!();
             // We insert the document under the documents ids map into the final file.
             final_sorter.insert(docid.to_be_bytes(), obkv)?;
             documents_count += 1;
 
+            dbg!();
             let reader = obkv::KvReader::new(obkv);
             for (field_id, _) in reader.iter() {
                 let field_name = fields_ids_map.name(field_id).unwrap();
                 *field_distribution.entry(field_name.to_string()).or_default() += 1;
             }
+            dbg!();
         }
 
         progress_callback(UpdateIndexingStep::ComputeIdsAndMergeDocuments {
             documents_seen: documents_count,
             total_documents: documents_count,
         });
+        dbg!();
 
         // We create a final writer to write the new documents in order from the sorter.
         let file = tempfile::tempfile()?;
