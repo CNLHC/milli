@@ -109,7 +109,7 @@ impl<'t, 'u, 'i> WordsLevelPositions<'t, 'u, 'i> {
             // iter over all lines of the DB where the key is prefixed by the current prefix.
             let mut iter = db
                 .remap_key_type::<ByteSlice>()
-                .prefix_iter(self.wtxn, prefix_bytes)?
+                .prefix_iter(self.wtxn, &prefix_bytes)?
                 .remap_key_type::<StrLevelPositionCodec>();
             while let Some(((_word, level, left, right), data)) = iter.next().transpose()? {
                 // if level is 0, we push the line in the sorter
@@ -262,7 +262,7 @@ fn write_level_entry(
 ) -> Result<()> {
     let key = (word, level, left, right);
     let key = StrLevelPositionCodec::bytes_encode(&key).ok_or(Error::Encoding)?;
-    let data = CboRoaringBitmapCodec::bytes_encode(ids).ok_or(Error::Encoding)?;
+    let data = CboRoaringBitmapCodec::bytes_encode(&ids).ok_or(Error::Encoding)?;
     writer.insert(&key, &data)?;
     Ok(())
 }

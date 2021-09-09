@@ -6,8 +6,9 @@ use big_s::S;
 use either::{Either, Left, Right};
 use heed::EnvOpenOptions;
 use maplit::{hashmap, hashset};
-use milli::update::{Settings, UpdateBuilder};
+use milli::update::{IndexDocuments, Settings, UpdateBuilder};
 use milli::documents::{DocumentsBuilder, DocumentsReader};
+use milli::update::{IndexDocuments, Settings};
 use milli::{AscDesc, Criterion, DocumentId, Index};
 use serde::Deserialize;
 use slice_group_by::GroupBy;
@@ -59,7 +60,7 @@ pub fn setup_search_index_with_criteria(criteria: &[Criterion]) -> Index {
     builder.enable_autogenerate_docids();
     let mut cursor = Cursor::new(Vec::new());
     let mut documents_builder =
-        DocumentsBuilder::new(&mut cursor).unwrap();
+        DocumentsBuilder::new(&mut cursor, bimap::BiHashMap::new()).unwrap();
     let reader = Cursor::new(CONTENT.as_bytes());
     for doc in serde_json::Deserializer::from_reader(reader).into_iter::<serde_json::Value>() {
         documents_builder.add_documents(doc.unwrap()).unwrap();

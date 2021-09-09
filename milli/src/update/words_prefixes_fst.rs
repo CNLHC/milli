@@ -1,6 +1,7 @@
+use std::iter::FromIterator;
 use std::str;
 
-use fst::{Streamer, set::OpBuilder};
+use fst::Streamer;
 
 use crate::{Index, Result, SmallString32};
 
@@ -50,6 +51,7 @@ impl<'t, 'u, 'i> WordsPrefixesFst<'t, 'u, 'i> {
     #[logging_timer::time("WordsPrefixesFst::{}")]
     pub fn execute(self) -> Result<()> {
         let words_fst = self.index.words_fst(&self.wtxn)?;
+
         let mut prefix_fsts = Vec::with_capacity(self.max_prefix_length);
         for n in 1..=self.max_prefix_length {
             let mut current_prefix = SmallString32::new();
@@ -87,7 +89,7 @@ impl<'t, 'u, 'i> WordsPrefixesFst<'t, 'u, 'i> {
         }
 
         // We merge all of the previously computed prefixes into on final set.
-        let op: OpBuilder = prefix_fsts.iter().collect();
+        let op = fst::set::OpBuilder::from_iter(prefix_fsts.iter());
         let mut builder = fst::SetBuilder::memory();
         builder.extend_stream(op.r#union())?;
         let prefix_fst = builder.into_set();

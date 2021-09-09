@@ -132,11 +132,11 @@ impl<'c> Context<'c> for CriteriaBuilder<'c> {
     }
 
     fn word_docids(&self, word: &str) -> heed::Result<Option<RoaringBitmap>> {
-        self.index.word_docids.get(self.rtxn, word)
+        self.index.word_docids.get(self.rtxn, &word)
     }
 
     fn word_prefix_docids(&self, word: &str) -> heed::Result<Option<RoaringBitmap>> {
-        self.index.word_prefix_docids.get(self.rtxn, word)
+        self.index.word_prefix_docids.get(self.rtxn, &word)
     }
 
     fn word_pair_proximity_docids(
@@ -282,7 +282,7 @@ impl<'t> CriteriaBuilder<'t> {
 
         let mut criterion =
             Box::new(Initial::new(query_tree, filtered_candidates)) as Box<dyn Criterion>;
-        for name in self.index.criteria(self.rtxn)? {
+        for name in self.index.criteria(&self.rtxn)? {
             criterion = match name {
                 Name::Words => Box::new(Words::new(self, criterion)),
                 Name::Typo => Box::new(Typo::new(self, criterion)),
@@ -291,14 +291,14 @@ impl<'t> CriteriaBuilder<'t> {
                         for asc_desc in sort_criteria {
                             criterion = match asc_desc {
                                 AscDescName::Asc(field) => Box::new(AscDesc::asc(
-                                    self.index,
-                                    self.rtxn,
+                                    &self.index,
+                                    &self.rtxn,
                                     criterion,
                                     field.to_string(),
                                 )?),
                                 AscDescName::Desc(field) => Box::new(AscDesc::desc(
-                                    self.index,
-                                    self.rtxn,
+                                    &self.index,
+                                    &self.rtxn,
                                     criterion,
                                     field.to_string(),
                                 )?),
@@ -312,10 +312,10 @@ impl<'t> CriteriaBuilder<'t> {
                 Name::Attribute => Box::new(Attribute::new(self, criterion)),
                 Name::Exactness => Box::new(Exactness::new(self, criterion, &primitive_query)?),
                 Name::Asc(field) => {
-                    Box::new(AscDesc::asc(self.index, self.rtxn, criterion, field)?)
+                    Box::new(AscDesc::asc(&self.index, &self.rtxn, criterion, field)?)
                 }
                 Name::Desc(field) => {
-                    Box::new(AscDesc::desc(self.index, self.rtxn, criterion, field)?)
+                    Box::new(AscDesc::desc(&self.index, &self.rtxn, criterion, field)?)
                 }
             };
         }
@@ -418,25 +418,25 @@ fn query_docids(
 ) -> Result<RoaringBitmap> {
     match &query.kind {
         QueryKind::Exact { word, .. } => {
-            if query.prefix && ctx.in_prefix_cache(word) {
-                Ok(ctx.word_prefix_docids(word)?.unwrap_or_default())
+            if query.prefix && ctx.in_prefix_cache(&word) {
+                Ok(ctx.word_prefix_docids(&word)?.unwrap_or_default())
             } else if query.prefix {
-                let words = word_derivations(word, true, 0, ctx.words_fst(), wdcache)?;
+                let words = word_derivations(&word, true, 0, ctx.words_fst(), wdcache)?;
                 let mut docids = RoaringBitmap::new();
                 for (word, _typo) in words {
-                    let current_docids = ctx.word_docids(word)?.unwrap_or_default();
+                    let current_docids = ctx.word_docids(&word)?.unwrap_or_default();
                     docids |= current_docids;
                 }
                 Ok(docids)
             } else {
-                Ok(ctx.word_docids(word)?.unwrap_or_default())
+                Ok(ctx.word_docids(&word)?.unwrap_or_default())
             }
         }
         QueryKind::Tolerant { typo, word } => {
-            let words = word_derivations(word, query.prefix, *typo, ctx.words_fst(), wdcache)?;
+            let words = word_derivations(&word, query.prefix, *typo, ctx.words_fst(), wdcache)?;
             let mut docids = RoaringBitmap::new();
             for (word, _typo) in words {
-                let current_docids = ctx.word_docids(word)?.unwrap_or_default();
+                let current_docids = ctx.word_docids(&word)?.unwrap_or_default();
                 docids |= current_docids;
             }
             Ok(docids)
@@ -480,7 +480,8 @@ fn query_pair_proximity_docids(
             }
         }
         (QueryKind::Tolerant { typo, word: left }, QueryKind::Exact { word: right, .. }) => {
-            let l_words = word_derivations(&left, false, *typo, ctx.words_fst(), wdcache)?.to_owned();
+            let l_words =
+                word_derivations(&left, false, *typo, ctx.words_fst(), wdcache)?.to_owned();
             if prefix {
                 let mut docids = RoaringBitmap::new();
                 for (left, _) in l_words {
@@ -504,17 +505,17 @@ fn query_pair_proximity_docids(
             }
         }
         (QueryKind::Exact { word: left, .. }, QueryKind::Tolerant { typo, word: right }) => {
-            let r_words = word_derivations(right, prefix, *typo, ctx.words_fst(), wdcache)?;
-            all_word_pair_proximity_docids(ctx, &[(left, 0)], r_words, proximity)
+            let r_words = word_derivations(&right, prefix, *typo, ctx.words_fst(), wdcache)?;
+            all_word_pair_proximity_docids(ctx, &[(left, 0)], &r_words, proximity)
         }
         (
             QueryKind::Tolerant { typo: l_typo, word: left },
             QueryKind::Tolerant { typo: r_typo, word: right },
         ) => {
             let l_words =
-                word_derivations(left, false, *l_typo, ctx.words_fst(), wdcache)?.to_owned();
-            let r_words = word_derivations(right, prefix, *r_typo, ctx.words_fst(), wdcache)?;
-            all_word_pair_proximity_docids(ctx, &l_words, r_words, proximity)
+                word_derivations(&left, false, *l_typo, ctx.words_fst(), wdcache)?.to_owned();
+            let r_words = word_derivations(&right, prefix, *r_typo, ctx.words_fst(), wdcache)?;
+            all_word_pair_proximity_docids(ctx, &l_words, &r_words, proximity)
         }
     }
 }

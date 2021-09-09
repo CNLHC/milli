@@ -53,7 +53,10 @@ impl<'t> Criterion for Words<'t> {
                         None => None,
                     };
 
-                    let bucket_candidates = self.bucket_candidates.as_mut().map(take);
+                    let bucket_candidates = match self.bucket_candidates.as_mut() {
+                        Some(bucket_candidates) => Some(take(bucket_candidates)),
+                        None => None,
+                    };
 
                     return Ok(Some(CriterionResult {
                         query_tree: Some(query_tree),

@@ -404,7 +404,7 @@ impl FilterCondition {
             GreaterThanOrEqual(val) => (Included(*val), Included(f64::MAX)),
             Equal(number, string) => {
                 let (_original_value, string_docids) =
-                    strings_db.get(rtxn, &(field_id, string))?.unwrap_or_default();
+                    strings_db.get(rtxn, &(field_id, &string))?.unwrap_or_default();
                 let number_docids = match number {
                     Some(n) => {
                         let n = Included(*n);

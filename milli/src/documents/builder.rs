@@ -1,22 +1,23 @@
 use std::io;
 
+use bimap::BiHashMap;
 use byteorder::{BigEndian, WriteBytesExt};
 use serde::ser::Serialize;
 
 use super::serde::DocumentsSerilializer;
-use super::{ByteCounter, DocumentsMetadata, Error, AdditionIndex};
+use super::{ByteCounter, DocumentsMetadata, Error};
+use crate::FieldId;
 
 pub struct DocumentsBuilder<W> {
     serializer: DocumentsSerilializer<W>,
 }
 
 impl<W: io::Write + io::Seek> DocumentsBuilder<W> {
-    pub fn new(writer: W) -> Result<Self, Error> {
+    pub fn new(writer: W, index: BiHashMap<FieldId, String>) -> Result<Self, Error> {
         let mut writer = ByteCounter::new(writer);
         // add space to write the offset of the metadata at the end of the writer
         writer.write_u64::<BigEndian>(0)?;
 
-        let index = AdditionIndex::new();
         let serializer =
             DocumentsSerilializer { writer, buffer: Vec::new(), index, count: 0, allow_seq: true };
 

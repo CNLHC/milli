@@ -288,7 +288,7 @@ impl<'t, 'q> QueryLevelIterator<'t, 'q> {
         for query in queries {
             match &query.kind {
                 QueryKind::Exact { word, .. } => {
-                    if !query.prefix || ctx.in_prefix_cache(word) {
+                    if !query.prefix || ctx.in_prefix_cache(&word) {
                         let word = Cow::Borrowed(query.kind.word());
                         if let Some(word_level_iterator) =
                             WordLevelIterator::new(ctx, word, query.prefix)?
@@ -296,7 +296,7 @@ impl<'t, 'q> QueryLevelIterator<'t, 'q> {
                             inner.push(word_level_iterator);
                         }
                     } else {
-                        for (word, _) in word_derivations(word, true, 0, ctx.words_fst(), wdcache)?
+                        for (word, _) in word_derivations(&word, true, 0, ctx.words_fst(), wdcache)?
                         {
                             let word = Cow::Owned(word.to_owned());
                             if let Some(word_level_iterator) =
@@ -309,7 +309,7 @@ impl<'t, 'q> QueryLevelIterator<'t, 'q> {
                 }
                 QueryKind::Tolerant { typo, word } => {
                     for (word, _) in
-                        word_derivations(word, query.prefix, *typo, ctx.words_fst(), wdcache)?
+                        word_derivations(&word, query.prefix, *typo, ctx.words_fst(), wdcache)?
                     {
                         let word = Cow::Owned(word.to_owned());
                         if let Some(word_level_iterator) = WordLevelIterator::new(ctx, word, false)?
