@@ -19,7 +19,7 @@ use flate2::read::GzDecoder;
 use futures::{stream, FutureExt, StreamExt};
 use heed::EnvOpenOptions;
 use meilisearch_tokenizer::{Analyzer, AnalyzerConfig};
-use milli::documents::DocumentsReader;
+use milli::documents::DocumentBatchReader;
 use milli::update::UpdateIndexingStep::*;
 use milli::update::{IndexDocumentsMethod, Setting, UpdateBuilder};
 use milli::{obkv_to_json, CompressionType, FilterCondition, Index, MatchingWords, SearchResult};
@@ -379,7 +379,7 @@ async fn main() -> anyhow::Result<()> {
                             otherwise => panic!("invalid update format {:?}", otherwise),
                         };
 
-                        let documents = DocumentsReader::from_reader(Cursor::new(documents))?;
+                        let documents = DocumentBatchReader::from_reader(Cursor::new(documents))?;
 
                         let result = builder.execute(documents, |indexing_step, update_id| {
                             let (current, total) = match indexing_step {
@@ -1021,8 +1021,7 @@ async fn main() -> anyhow::Result<()> {
 
 fn documents_from_jsonl(reader: impl io::Read) -> anyhow::Result<Vec<u8>> {
     let mut writer = Cursor::new(Vec::new());
-    let mut documents =
-        milli::documents::DocumentsBuilder::new(&mut writer, bimap::BiHashMap::new())?;
+    let mut documents = milli::documents::DocumentBatchBuilder::new(&mut writer)?;
 
     let values = serde_json::Deserializer::from_reader(reader)
         .into_iter::<serde_json::Map<String, serde_json::Value>>();
@@ -1037,8 +1036,7 @@ fn documents_from_jsonl(reader: impl io::Read) -> anyhow::Result<Vec<u8>> {
 
 fn documents_from_json(reader: impl io::Read) -> anyhow::Result<Vec<u8>> {
     let mut writer = Cursor::new(Vec::new());
-    let mut documents =
-        milli::documents::DocumentsBuilder::new(&mut writer, bimap::BiHashMap::new())?;
+    let mut documents = milli::documents::DocumentBatchBuilder::new(&mut writer)?;
 
     let json: serde_json::Value = serde_json::from_reader(reader)?;
     documents.add_documents(json)?;
@@ -1049,8 +1047,7 @@ fn documents_from_json(reader: impl io::Read) -> anyhow::Result<Vec<u8>> {
 
 fn documents_from_csv(reader: impl io::Read) -> anyhow::Result<Vec<u8>> {
     let mut writer = Cursor::new(Vec::new());
-    let mut documents =
-        milli::documents::DocumentsBuilder::new(&mut writer, bimap::BiHashMap::new())?;
+    let mut documents = milli::documents::DocumentBatchBuilder::new(&mut writer)?;
 
     let mut records = csv::Reader::from_reader(reader);
     let iter = records.deserialize::<Map<String, Value>>();

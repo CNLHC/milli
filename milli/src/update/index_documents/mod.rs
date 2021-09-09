@@ -4,10 +4,10 @@ mod transform;
 mod typed_chunk;
 
 use std::collections::HashSet;
+use std::io::{Read, Seek};
 use std::iter::FromIterator;
 use std::num::{NonZeroU32, NonZeroUsize};
 use std::time::Instant;
-use std::io::{Read, Seek};
 
 use chrono::Utc;
 use crossbeam_channel::{Receiver, Sender};
@@ -24,12 +24,12 @@ pub use self::helpers::{
 };
 use self::helpers::{grenad_obkv_into_chunks, GrenadParameters};
 pub use self::transform::{Transform, TransformOutput};
-use crate::{Index, Result};
-use crate::documents::DocumentsReader;
+use crate::documents::DocumentBatchReader;
 use crate::update::{
     Facets, UpdateBuilder, UpdateIndexingStep, WordPrefixDocids, WordPrefixPairProximityDocids,
     WordsLevelPositions, WordsPrefixesFst,
 };
+use crate::{Index, Result};
 
 static MERGED_DATABASE_COUNT: usize = 7;
 static PREFIX_DATABASE_COUNT: usize = 5;
@@ -126,7 +126,7 @@ impl<'t, 'u, 'i, 'a> IndexDocuments<'t, 'u, 'i, 'a> {
     #[logging_timer::time("IndexDocuments::{}")]
     pub fn execute<R, F>(
         self,
-        reader: DocumentsReader<R>,
+        reader: DocumentBatchReader<R>,
         progress_callback: F,
     ) -> Result<DocumentAdditionResult>
     where
@@ -134,7 +134,7 @@ impl<'t, 'u, 'i, 'a> IndexDocuments<'t, 'u, 'i, 'a> {
         F: Fn(UpdateIndexingStep, u64) + Sync,
     {
         // Early return when there is no document to add
-        if reader.len() == 0 {
+        if reader.is_empty() {
             return Ok(DocumentAdditionResult { nb_documents: 0 });
         }
 
@@ -423,11 +423,10 @@ mod tests {
     use std::io::Cursor;
 
     use big_s::S;
-    use bimap::BiHashMap;
     use heed::EnvOpenOptions;
 
     use super::*;
-    use crate::documents::DocumentsBuilder;
+    use crate::documents::DocumentBatchBuilder;
     use crate::update::DeleteDocuments;
     use crate::HashMap;
 
@@ -858,11 +857,11 @@ mod tests {
 
         let mut cursor = Cursor::new(Vec::new());
 
-        let mut builder = DocumentsBuilder::new(&mut cursor, BiHashMap::new()).unwrap();
+        let mut builder = DocumentBatchBuilder::new(&mut cursor).unwrap();
         builder.add_documents(big_object).unwrap();
         builder.finish().unwrap();
         cursor.set_position(0);
-        let content = DocumentsReader::from_reader(cursor).unwrap();
+        let content = DocumentBatchReader::from_reader(cursor).unwrap();
 
         let builder = IndexDocuments::new(&mut wtxn, &index, 0);
         builder.execute(content, |_, _| ()).unwrap();

@@ -16,10 +16,10 @@ use super::helpers::{
     create_sorter, create_writer, keep_latest_obkv, merge_obkvs, merge_two_obkvs, MergeFn,
 };
 use super::IndexDocumentsMethod;
+use crate::documents::{DocumentBatchReader, DocumentsBatchIndex};
 use crate::error::{Error, InternalError, UserError};
 use crate::index::db_name;
 use crate::update::{AvailableDocumentsIds, UpdateIndexingStep};
-use crate::documents::DocumentsReader;
 use crate::{ExternalDocumentsIds, FieldDistribution, FieldId, FieldsIdsMap, Index, Result, BEU32};
 
 const DEFAULT_PRIMARY_KEY_NAME: &str = "id";
@@ -53,22 +53,22 @@ pub struct Transform<'t, 'i> {
     pub autogenerate_docids: bool,
 }
 
-/// Create the mapping between the field ids present in a document addition and the one in the
-/// current fields id map.
+/// Create a mapping between the field ids found in the document batch and the one that were
+/// already present in the index.
 ///
-/// If new fields are present in the addition, they are added to the provided field ids map.
+/// If new fields are present in the addition, they are added to the index field ids map.
 fn create_fields_mapping(
-    fields_id_map: &mut FieldsIdsMap,
-    addition_fields_map: &bimap::BiHashMap<u16, String>,
+    index_field_map: &mut FieldsIdsMap,
+    batch_field_map: &DocumentsBatchIndex,
 ) -> Result<HashMap<FieldId, FieldId>> {
-    addition_fields_map
+    batch_field_map
         .iter()
         // we sort by id here to ensure a deterministic mapping of the fields, that preserves
         // the original ordering.
         .sorted_by_key(|(&id, _)| id)
-        .map(|(field, name)| match fields_id_map.id(&name) {
+        .map(|(field, name)| match index_field_map.id(&name) {
             Some(id) => Ok((*field, id)),
-            None => fields_id_map
+            None => index_field_map
                 .insert(&name)
                 .ok_or(Error::UserError(UserError::AttributeLimitReached))
                 .map(|id| (*field, id)),
@@ -86,7 +86,7 @@ fn find_primary_key(index: &bimap::BiHashMap<u16, String>) -> Option<&str> {
 impl Transform<'_, '_> {
     pub fn read_documents<R, F>(
         self,
-        mut reader: DocumentsReader<R>,
+        mut reader: DocumentBatchReader<R>,
         progress_callback: F,
     ) -> Result<TransformOutput>
     where
@@ -146,7 +146,7 @@ impl Transform<'_, '_> {
 
             // We need to make sure that every document has a primary key. After we have remapped
             // all the fields in the document, we try to find the primary key value. If we can find
-            // it, transform it into a string and validate it, and then update it in the the
+            // it, transform it into a string and validate it, and then update it in the
             // document. If none is found, and we were told to generate missing document ids, then
             // we create the missing field, and update the new document.
             let external_id = match field_buffer.iter_mut().find(|(id, _)| *id == primary_key_id) {
@@ -201,7 +201,7 @@ impl Transform<'_, '_> {
             // fieldids map keys order.
             field_buffer.sort_unstable_by(|(f1, _), (f2, _)| f1.cmp(&f2));
 
-            // The last step is to build the new new obkv document, and insert it in the sorter.
+            // The last step is to build the new obkv document, and insert it in the sorter.
             let mut writer = obkv::KvWriter::new(&mut obkv_buffer);
             for (k, v) in field_buffer.iter() {
                 writer.insert(*k, v)?;

@@ -1,23 +1,22 @@
 use std::convert::TryInto;
 use std::{fmt, io};
 
-use bimap::BiHashMap;
 use byteorder::{BigEndian, WriteBytesExt};
 use obkv::KvWriter;
 use serde::ser::{Impossible, Serialize, SerializeMap, SerializeSeq, Serializer};
 
-use super::{ByteCounter, Error};
+use super::{ByteCounter, DocumentsBatchIndex, Error};
 use crate::FieldId;
 
-pub struct DocumentsSerilializer<W> {
+pub struct DocumentSerializer<W> {
     pub writer: ByteCounter<W>,
     pub buffer: Vec<u8>,
-    pub index: BiHashMap<FieldId, String>,
+    pub index: DocumentsBatchIndex,
     pub count: usize,
     pub allow_seq: bool,
 }
 
-impl<'a, W: io::Write> Serializer for &'a mut DocumentsSerilializer<W> {
+impl<'a, W: io::Write> Serializer for &'a mut DocumentSerializer<W> {
     type Ok = ();
 
     type Error = Error;
@@ -203,7 +202,7 @@ impl<'a, W: io::Write> Serializer for &'a mut DocumentsSerilializer<W> {
 }
 
 pub struct SeqSerializer<'a, W> {
-    serializer: &'a mut DocumentsSerilializer<W>,
+    serializer: &'a mut DocumentSerializer<W>,
 }
 
 impl<'a, W: io::Write> SerializeSeq for SeqSerializer<'a, W> {
@@ -225,7 +224,7 @@ impl<'a, W: io::Write> SerializeSeq for SeqSerializer<'a, W> {
 
 pub struct MapSerializer<'a, W> {
     map: KvWriter<io::Cursor<&'a mut Vec<u8>>, FieldId>,
-    index: &'a mut BiHashMap<FieldId, String>,
+    index: &'a mut DocumentsBatchIndex,
     writer: W,
     buffer: Vec<u8>,
 }
@@ -277,7 +276,7 @@ impl<'a, W: io::Write> SerializeMap for MapSerializer<'a, W> {
 }
 
 struct FieldSerializer<'a> {
-    index: &'a mut BiHashMap<FieldId, String>,
+    index: &'a mut DocumentsBatchIndex,
 }
 
 impl<'a> serde::Serializer for FieldSerializer<'a> {

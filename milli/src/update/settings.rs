@@ -722,7 +722,7 @@ mod tests {
         let count = index
             .facet_id_f64_docids
             .remap_key_type::<ByteSlice>()
-            // The faceted field id is 2u16
+            // The faceted field id is 1u16
             .prefix_iter(&rtxn, &[0, 1, 0])
             .unwrap()
             .count();

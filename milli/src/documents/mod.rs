@@ -2,8 +2,8 @@ mod builder;
 /// The documents module defines an intermediary document format that milli uses for indexation, and
 /// provides an API to easily build and read such documents.
 ///
-/// The `DocumentBuilder` interface allows to write batches of documents to a writer, that can
-/// later be read by milli using the `DocumentsReader` interface.
+/// The `DocumentBatchBuilder` interface allows to write batches of documents to a writer, that can
+/// later be read by milli using the `DocumentBatchReader` interface.
 mod reader;
 mod serde;
 
@@ -11,15 +11,18 @@ use std::{fmt, io};
 
 use ::serde::{Deserialize, Serialize};
 use bimap::BiHashMap;
-pub use builder::DocumentsBuilder;
-pub use reader::DocumentsReader;
+pub use builder::DocumentBatchBuilder;
+pub use reader::DocumentBatchReader;
 
 use crate::FieldId;
+
+/// A bidirectional map that links field ids to their name in a document batch.
+pub type DocumentsBatchIndex = BiHashMap<FieldId, String>;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct DocumentsMetadata {
     count: usize,
-    index: BiHashMap<FieldId, String>,
+    index: DocumentsBatchIndex,
 }
 
 pub struct ByteCounter<W> {
@@ -88,14 +91,13 @@ macro_rules! documents {
     ($data:tt) => {{
         let documents = serde_json::json!($data);
         let mut writer = std::io::Cursor::new(Vec::new());
-        let mut builder =
-            crate::documents::DocumentsBuilder::new(&mut writer, bimap::BiHashMap::new()).unwrap();
+        let mut builder = crate::documents::DocumentBatchBuilder::new(&mut writer).unwrap();
         builder.add_documents(documents).unwrap();
         builder.finish().unwrap();
 
         writer.set_position(0);
 
-        crate::documents::DocumentsReader::from_reader(writer).unwrap()
+        crate::documents::DocumentBatchReader::from_reader(writer).unwrap()
     }};
 }
 
@@ -120,14 +122,14 @@ mod test {
         let mut v = Vec::new();
         let mut cursor = io::Cursor::new(&mut v);
 
-        let mut builder = DocumentsBuilder::new(&mut cursor, BiHashMap::new()).unwrap();
+        let mut builder = DocumentBatchBuilder::new(&mut cursor).unwrap();
 
         builder.add_documents(json).unwrap();
 
         builder.finish().unwrap();
 
         let mut documents =
-            DocumentsReader::from_reader(io::Cursor::new(cursor.into_inner())).unwrap();
+            DocumentBatchReader::from_reader(io::Cursor::new(cursor.into_inner())).unwrap();
 
         assert_eq!(documents.index().iter().count(), 5);
 
@@ -149,7 +151,7 @@ mod test {
         let mut v = Vec::new();
         let mut cursor = io::Cursor::new(&mut v);
 
-        let mut builder = DocumentsBuilder::new(&mut cursor, BiHashMap::new()).unwrap();
+        let mut builder = DocumentBatchBuilder::new(&mut cursor).unwrap();
 
         builder.add_documents(doc1).unwrap();
         builder.add_documents(doc2).unwrap();
@@ -157,7 +159,7 @@ mod test {
         builder.finish().unwrap();
 
         let mut documents =
-            DocumentsReader::from_reader(io::Cursor::new(cursor.into_inner())).unwrap();
+            DocumentBatchReader::from_reader(io::Cursor::new(cursor.into_inner())).unwrap();
 
         assert_eq!(documents.index().iter().count(), 2);
 
@@ -178,14 +180,14 @@ mod test {
         let mut v = Vec::new();
         let mut cursor = io::Cursor::new(&mut v);
 
-        let mut builder = DocumentsBuilder::new(&mut cursor, BiHashMap::new()).unwrap();
+        let mut builder = DocumentBatchBuilder::new(&mut cursor).unwrap();
 
         builder.add_documents(docs).unwrap();
 
         builder.finish().unwrap();
 
         let mut documents =
-            DocumentsReader::from_reader(io::Cursor::new(cursor.into_inner())).unwrap();
+            DocumentBatchReader::from_reader(io::Cursor::new(cursor.into_inner())).unwrap();
 
         assert_eq!(documents.index().iter().count(), 2);
 
@@ -201,7 +203,7 @@ mod test {
         let mut v = Vec::new();
         let mut cursor = io::Cursor::new(&mut v);
 
-        let mut builder = DocumentsBuilder::new(&mut cursor, BiHashMap::new()).unwrap();
+        let mut builder = DocumentBatchBuilder::new(&mut cursor).unwrap();
 
         let docs = json!([[
             { "toto": false },

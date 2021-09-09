@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::{stdin, Cursor, Read};
-use std::{path::PathBuf, str::FromStr};
+use std::path::PathBuf;
+use std::str::FromStr;
 
 use byte_unit::Byte;
 use eyre::Result;
@@ -86,7 +87,7 @@ impl FromStr for DocumentAdditionFormat {
 
 #[derive(Debug, StructOpt)]
 struct DocumentAddition {
-    #[structopt(short, long, default_value = "json")]
+    #[structopt(short, long, default_value = "json", possible_values = &["csv", "jsonl", "json"])]
     format: DocumentAdditionFormat,
     /// Path to the update file, if not present, will read from stdin.
     #[structopt(short, long)]
@@ -117,7 +118,7 @@ impl DocumentAddition {
             DocumentAdditionFormat::Jsonl => documents_from_jsonl(reader)?,
         };
 
-        let reader = milli::documents::DocumentsReader::from_reader(Cursor::new(documents))?;
+        let reader = milli::documents::DocumentBatchReader::from_reader(Cursor::new(documents))?;
 
         println!("Adding {} documents to the index.", reader.len());
 
@@ -199,8 +200,7 @@ fn indexing_callback(step: milli::update::UpdateIndexingStep, bars: &[ProgressBa
 
 fn documents_from_jsonl(reader: impl Read) -> Result<Vec<u8>> {
     let mut writer = Cursor::new(Vec::new());
-    let mut documents =
-        milli::documents::DocumentsBuilder::new(&mut writer, bimap::BiHashMap::new())?;
+    let mut documents = milli::documents::DocumentBatchBuilder::new(&mut writer)?;
 
     let values = serde_json::Deserializer::from_reader(reader)
         .into_iter::<serde_json::Map<String, serde_json::Value>>();
@@ -215,8 +215,7 @@ fn documents_from_jsonl(reader: impl Read) -> Result<Vec<u8>> {
 
 fn documents_from_json(reader: impl Read) -> Result<Vec<u8>> {
     let mut writer = Cursor::new(Vec::new());
-    let mut documents =
-        milli::documents::DocumentsBuilder::new(&mut writer, bimap::BiHashMap::new())?;
+    let mut documents = milli::documents::DocumentBatchBuilder::new(&mut writer)?;
 
     let json: serde_json::Value = serde_json::from_reader(reader)?;
     documents.add_documents(json)?;
@@ -227,8 +226,7 @@ fn documents_from_json(reader: impl Read) -> Result<Vec<u8>> {
 
 fn documents_from_csv(reader: impl Read) -> Result<Vec<u8>> {
     let mut writer = Cursor::new(Vec::new());
-    let mut documents =
-        milli::documents::DocumentsBuilder::new(&mut writer, bimap::BiHashMap::new())?;
+    let mut documents = milli::documents::DocumentBatchBuilder::new(&mut writer)?;
 
     let mut records = csv::Reader::from_reader(reader);
     let iter = records.deserialize::<Map<String, Value>>();

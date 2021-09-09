@@ -1,25 +1,41 @@
 use std::io;
 
-use bimap::BiHashMap;
 use byteorder::{BigEndian, WriteBytesExt};
 use serde::ser::Serialize;
 
-use super::serde::DocumentsSerilializer;
-use super::{ByteCounter, DocumentsMetadata, Error};
-use crate::FieldId;
+use super::serde::DocumentSerializer;
+use super::{ByteCounter, DocumentsBatchIndex, DocumentsMetadata, Error};
 
-pub struct DocumentsBuilder<W> {
-    serializer: DocumentsSerilializer<W>,
+/// The `DocumentsBatchBuilder` provides a way to build a documents batch in the intermediary
+/// format used by milli.
+///
+/// The writer used by the DocumentBatchBuilder can be read using a `DocumentBatchReader` to
+/// iterate other the documents.
+///
+/// ## example:
+/// ```
+/// use milli::documents::DocumentBatchBuilder;
+/// use serde_json::json;
+/// use std::io::Cursor;
+///
+/// let mut writer = Cursor::new(Vec::new());
+/// let mut builder = DocumentBatchBuilder::new(&mut writer).unwrap();
+/// builder.add_documents(json!({"id": 1, "name": "foo"})).unwrap();
+/// builder.finish().unwrap();
+/// ```
+pub struct DocumentBatchBuilder<W> {
+    serializer: DocumentSerializer<W>,
 }
 
-impl<W: io::Write + io::Seek> DocumentsBuilder<W> {
-    pub fn new(writer: W, index: BiHashMap<FieldId, String>) -> Result<Self, Error> {
+impl<W: io::Write + io::Seek> DocumentBatchBuilder<W> {
+    pub fn new(writer: W) -> Result<Self, Error> {
+        let index = DocumentsBatchIndex::new();
         let mut writer = ByteCounter::new(writer);
         // add space to write the offset of the metadata at the end of the writer
         writer.write_u64::<BigEndian>(0)?;
 
         let serializer =
-            DocumentsSerilializer { writer, buffer: Vec::new(), index, count: 0, allow_seq: true };
+            DocumentSerializer { writer, buffer: Vec::new(), index, count: 0, allow_seq: true };
 
         Ok(Self { serializer })
     }
@@ -33,7 +49,7 @@ impl<W: io::Write + io::Seek> DocumentsBuilder<W> {
     /// metadata at the end of the file, and write the metadata offset at the beginning on the
     /// file.
     pub fn finish(self) -> Result<(), Error> {
-        let DocumentsSerilializer {
+        let DocumentSerializer {
             writer: ByteCounter { mut writer, count: offset },
             index,
             count,

@@ -29,14 +29,13 @@ mod test {
     use std::collections::HashSet;
     use std::io::Cursor;
 
-    use bimap::BiHashMap;
     use once_cell::sync::Lazy;
     use rand::seq::SliceRandom;
     use rand::Rng;
     use roaring::RoaringBitmap;
     use serde_json::{json, Value};
 
-    use crate::documents::{DocumentsBuilder, DocumentsReader};
+    use crate::documents::{DocumentBatchBuilder, DocumentBatchReader};
     use crate::index::tests::TempIndex;
     use crate::index::Index;
     use crate::update::{IndexDocumentsMethod, UpdateBuilder};
@@ -49,7 +48,7 @@ mod test {
         let num_docs = rng.gen_range(10..30);
 
         let mut cursor = Cursor::new(Vec::new());
-        let mut builder = DocumentsBuilder::new(&mut cursor, BiHashMap::new()).unwrap();
+        let mut builder = DocumentBatchBuilder::new(&mut cursor).unwrap();
         let txts = ["Toto", "Titi", "Tata"];
         let cats = (1..10).map(|i| i.to_string()).collect::<Vec<_>>();
         let cat_ints = (1..10).collect::<Vec<_>>();
@@ -93,13 +92,14 @@ mod test {
         let mut addition = builder.index_documents(&mut txn, &index);
 
         addition.index_documents_method(IndexDocumentsMethod::ReplaceDocuments);
-        let reader = crate::documents::DocumentsReader::from_reader(Cursor::new(&*JSON)).unwrap();
+        let reader =
+            crate::documents::DocumentBatchReader::from_reader(Cursor::new(&*JSON)).unwrap();
         addition.execute(reader, |_, _| ()).unwrap();
 
         let fields_map = index.fields_ids_map(&txn).unwrap();
         let fid = fields_map.id(&distinct).unwrap();
 
-        let documents = DocumentsReader::from_reader(Cursor::new(&*JSON)).unwrap();
+        let documents = DocumentBatchReader::from_reader(Cursor::new(&*JSON)).unwrap();
         let map = (0..documents.len() as u32).collect();
 
         txn.commit().unwrap();
