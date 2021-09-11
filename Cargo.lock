@@ -1588,6 +1588,7 @@ dependencies = [
  "smallvec",
  "tempfile",
  "uuid",
+ "vec-utils",
 ]
 
 [[package]]
@@ -3121,6 +3122,12 @@ checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
 dependencies = [
  "getrandom 0.2.3",
 ]
+
+[[package]]
+name = "vec-utils"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6dac984aa016c26ef4ed7b2c30d6a1bd570fd40a078caccaf6415a2ac5d96161"
 
 [[package]]
 name = "vec_map"

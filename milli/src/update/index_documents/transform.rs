@@ -10,7 +10,7 @@ use itertools::Itertools;
 use log::info;
 use roaring::RoaringBitmap;
 use serde_json::{Map, Value};
-use smallvec::SmallVec;
+use vec_utils::VecExt;
 
 use super::helpers::{
     create_sorter, create_writer, keep_latest_obkv, merge_obkvs, merge_two_obkvs, MergeFn,
@@ -128,20 +128,20 @@ impl Transform<'_, '_> {
 
         let mut obkv_buffer = Vec::new();
         let mut documents_count = 0;
+        let mut external_id_buffer = Vec::new();
+        let mut field_buffer: Vec<(u16, &[u8])> = Vec::new();
         while let Some((addition_index, document)) = reader.next_document_with_index()? {
+            let mut field_buffer_cache = field_buffer.drop_and_reuse();
             if self.log_every_n.map_or(false, |len| documents_count % len == 0) {
                 progress_callback(UpdateIndexingStep::RemapDocumentAddition {
                     documents_seen: documents_count,
                 });
             }
 
-            let mut external_id_buffer = SmallVec::<[u8; 512]>::new();
-            let mut field_buffer = SmallVec::<[(u16, &[u8]); 128]>::new();
-            let mut uuid_buffer = [0; uuid::adapter::Hyphenated::LENGTH];
 
             for (k, v) in document.iter() {
                 let mapped_id = *mapping.get(&k).unwrap();
-                field_buffer.push((mapped_id, v));
+                field_buffer_cache.push((mapped_id, v));
             }
 
             // We need to make sure that every document has a primary key. After we have remapped
@@ -149,7 +149,8 @@ impl Transform<'_, '_> {
             // it, transform it into a string and validate it, and then update it in the
             // document. If none is found, and we were told to generate missing document ids, then
             // we create the missing field, and update the new document.
-            let external_id = match field_buffer.iter_mut().find(|(id, _)| *id == primary_key_id) {
+            let mut uuid_buffer = [0; uuid::adapter::Hyphenated::LENGTH];
+            let external_id = match field_buffer_cache.iter_mut().find(|(id, _)| *id == primary_key_id) {
                 Some((_, bytes)) => {
                     let value = match serde_json::from_slice(bytes).unwrap() {
                         Value::String(string) => match validate_document_id(&string) {
@@ -191,7 +192,7 @@ impl Transform<'_, '_> {
 
                     let uuid = uuid::Uuid::new_v4().to_hyphenated().encode_lower(&mut uuid_buffer);
                     serde_json::to_writer(&mut external_id_buffer, &uuid).unwrap();
-                    field_buffer.push((primary_key_id, &external_id_buffer));
+                    field_buffer_cache.push((primary_key_id, &external_id_buffer));
                     Cow::Borrowed(&*uuid)
                 }
             };
@@ -199,11 +200,11 @@ impl Transform<'_, '_> {
             // Insertion in a obkv need to be done with keys ordered. For now they are ordered
             // according to the document addition key order, so we sort it according to the
             // fieldids map keys order.
-            field_buffer.sort_unstable_by(|(f1, _), (f2, _)| f1.cmp(&f2));
+            field_buffer_cache.sort_unstable_by(|(f1, _), (f2, _)| f1.cmp(&f2));
 
             // The last step is to build the new obkv document, and insert it in the sorter.
             let mut writer = obkv::KvWriter::new(&mut obkv_buffer);
-            for (k, v) in field_buffer.iter() {
+            for (k, v) in field_buffer_cache.iter() {
                 writer.insert(*k, v)?;
             }
 
@@ -216,6 +217,8 @@ impl Transform<'_, '_> {
             });
 
             obkv_buffer.clear();
+            field_buffer = field_buffer_cache.drop_and_reuse();
+            external_id_buffer.clear();
         }
 
         progress_callback(UpdateIndexingStep::RemapDocumentAddition {

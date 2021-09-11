@@ -35,6 +35,7 @@ smallstr =  { version = "0.2.0", features = ["serde"] }
 smallvec = { version = "1.6.1", features = ["write"] }
 tempfile = "3.2.0"
 uuid = { version = "0.8.2", features = ["v4"] }
+vec-utils = "0.3.0"
 
 # facet filter parser
 pest = { git = "https://github.com/pest-parser/pest.git", rev = "51fd1d49f1041f7839975664ef71fe15c7dcaf67" }
